@@ -1,0 +1,6 @@
+{
+  "name": "ÉGLISEBF - Plateforme de Gestion Ecclésiale & Multi-Églises",
+  "description": "Application SaaS multi-tenant propulsée par Supabase PostgreSQL, Auth, Storage et RLS pour la gestion complète des églises : membres, finances, présences, pastorale, discipulat et formations.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
