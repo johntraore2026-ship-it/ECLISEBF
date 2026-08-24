@@ -112,6 +112,11 @@ export const memberService = {
     const { data, error } = await query;
 
     if (error) {
+      // Graceful fallback to demo members if tables do not exist yet on Supabase
+      if (error.code === '42P01' || error.message.includes('does not exist') || error.message.includes('404')) {
+        console.warn('Supabase table "members" not found, using local fallback:', error.message);
+        return localDemoMembers.filter(m => m.church_id === churchId);
+      }
       throw new Error(`Erreur lors du chargement des membres : ${error.message}`);
     }
 
@@ -132,6 +137,9 @@ export const memberService = {
 
     if (error) {
       if (error.code === 'PGRST116') return null;
+      if (error.code === '42P01' || error.message.includes('does not exist') || error.message.includes('404')) {
+        return localDemoMembers.find(m => m.id === id && m.church_id === churchId) || null;
+      }
       throw new Error(`Erreur membre : ${error.message}`);
     }
 

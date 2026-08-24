@@ -244,7 +244,7 @@ CREATE TABLE IF NOT EXISTS audit_logs (
     created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- 8. FONCTIONS SÉCURISÉES RLS
+-- 8. FONCTIONS SÉCURISÉES RLS & TRIGGERS AUTH
 CREATE OR REPLACE FUNCTION user_church_id()
 RETURNS UUID AS $$
   SELECT church_id FROM profiles WHERE id = auth.uid() LIMIT 1;
@@ -260,6 +260,32 @@ RETURNS BOOLEAN AS $$
   );
 $$ LANGUAGE SQL STABLE SECURITY DEFINER;
 
+-- Trigger automatique de création de profil lors de l'inscription Supabase Auth
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS trigger AS $$
+BEGIN
+  INSERT INTO public.profiles (id, email, first_name, last_name, phone, status)
+  VALUES (
+    new.id,
+    new.email,
+    COALESCE(new.raw_user_meta_data->>'first_name', split_part(new.email, '@', 1)),
+    COALESCE(new.raw_user_meta_data->>'last_name', ''),
+    new.raw_user_meta_data->>'phone',
+    'ACTIVE'
+  )
+  ON CONFLICT (id) DO UPDATE SET
+    email = EXCLUDED.email,
+    first_name = COALESCE(EXCLUDED.first_name, profiles.first_name),
+    last_name = COALESCE(EXCLUDED.last_name, profiles.last_name);
+  RETURN new;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
+
 -- 9. ACTIVATION RLS
 ALTER TABLE churches ENABLE ROW LEVEL SECURITY;
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
@@ -271,6 +297,10 @@ ALTER TABLE finance_transactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE pastoral_records ENABLE ROW LEVEL SECURITY;
 ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
 
+CREATE POLICY "Profiles self manage" ON profiles FOR ALL TO authenticated
+USING (id = auth.uid() OR has_role('SUPER_ADMIN') OR has_role('CHURCH_ADMIN'))
+WITH CHECK (id = auth.uid() OR has_role('SUPER_ADMIN') OR has_role('CHURCH_ADMIN'));
+
 CREATE POLICY "Members tenant select" ON members FOR SELECT TO authenticated
 USING (church_id = user_church_id() OR has_role('SUPER_ADMIN'));
 
@@ -278,7 +308,41 @@ CREATE POLICY "Finance read strict" ON finance_transactions FOR SELECT TO authen
 USING (church_id = user_church_id() AND (has_role('CHURCH_ADMIN') OR has_role('TREASURER') OR has_role('PASTOR')));
 
 CREATE POLICY "Pastoral read strict" ON pastoral_records FOR SELECT TO authenticated
-USING (church_id = user_church_id() AND (has_role('PASTOR') OR pastor_id = auth.uid()));`;
+USING (church_id = user_church_id() AND (has_role('PASTOR') OR pastor_id = auth.uid()));
+
+-- 10. DONNÉES INITIALES (SEED)
+INSERT INTO churches (id, name, slug, city, neighborhood, address, phone, email, pastor_name, status)
+VALUES (
+  '11111111-1111-1111-1111-111111111111',
+  'Église Évangélique Béthel',
+  'bethel-ouaga',
+  'Ouagadougou',
+  'Gounghin',
+  'Secteur 09, Rue 9.15, Face Lycée',
+  '+226 25 34 00 00',
+  'contact@bethel-ouaga.bf',
+  'Pasteur Samuel Ouedraogo',
+  'ACTIVE'
+) ON CONFLICT (slug) DO NOTHING;
+
+INSERT INTO roles (id, code, name, description, is_system, level)
+VALUES
+  ('22222222-2222-2222-2222-222222222221', 'SUPER_ADMIN', 'Super Administrateur', 'Accès global multi-églises', true, 100),
+  ('22222222-2222-2222-2222-222222222222', 'CHURCH_ADMIN', 'Administrateur Église', 'Gestion complète de la paroisse', true, 80),
+  ('22222222-2222-2222-2222-222222222223', 'PASTOR', 'Pasteur / Responsable Spirituel', 'Suivi pastoral et prédication', true, 70),
+  ('22222222-2222-2222-2222-222222222224', 'TREASURER', 'Trésorier / Comptable', 'Gestion financière et dîmes', true, 60),
+  ('22222222-2222-2222-2222-222222222225', 'SECRETARY', 'Secrétaire Paroissial', 'Gestion des membres et présences', true, 50),
+  ('22222222-2222-2222-2222-222222222226', 'DEPARTMENT_LEADER', 'Responsable de Département', 'Coordination groupes et ministères', true, 40)
+ON CONFLICT (code) DO NOTHING;
+
+INSERT INTO finance_categories (id, church_id, name, type, code, is_system)
+VALUES
+  ('33333333-3333-3333-3333-333333333331', '11111111-1111-1111-1111-111111111111', 'Dîmes des membres', 'INCOME', 'DIMES', true),
+  ('33333333-3333-3333-3333-333333333332', '11111111-1111-1111-1111-111111111111', 'Offrandes ordinaires de culte', 'INCOME', 'OFFRANDES', true),
+  ('33333333-3333-3333-3333-333333333333', '11111111-1111-1111-1111-111111111111', 'Dons spéciaux & Projets', 'INCOME', 'DONS', true),
+  ('33333333-3333-3333-3333-333333333334', '11111111-1111-1111-1111-111111111111', 'Électricité & Eau (SONABEL / ONEA)', 'EXPENSE', 'CHARGES_EAU_ELEC', true),
+  ('33333333-3333-3333-3333-333333333335', '11111111-1111-1111-1111-111111111111', 'Aide sociale & Bienfaisance', 'EXPENSE', 'SOCIAL', true)
+ON CONFLICT DO NOTHING;`;
 
   const copySql = () => {
     navigator.clipboard.writeText(sqlScript);

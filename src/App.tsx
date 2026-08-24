@@ -46,7 +46,17 @@ const MainAppContent: React.FC = () => {
 
   // If user is not authenticated and not in demo mode, show AuthPage
   if (!user && !isDemoMode) {
-    return <AuthPage onSuccess={() => setActiveTab('dashboard')} />;
+    return (
+      <>
+        <AuthPage
+          onSuccess={() => setActiveTab('dashboard')}
+          onOpenSqlModal={() => setShowSqlModal(true)}
+        />
+        {showSqlModal && (
+          <SqlScriptModal isOpen={showSqlModal} onClose={() => setShowSqlModal(false)} />
+        )}
+      </>
+    );
   }
 
   const handleEditMember = (member: Member) => {

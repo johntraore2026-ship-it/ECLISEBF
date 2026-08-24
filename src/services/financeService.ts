@@ -28,6 +28,9 @@ export const financeService = {
       .order('name');
 
     if (error) {
+      if (error.code === '42P01' || error.message.includes('does not exist') || error.message.includes('404')) {
+        return localDemoCategories.filter(c => c.church_id === churchId);
+      }
       throw new Error(`Erreur lors du chargement des catégories financières : ${error.message}`);
     }
 
@@ -78,6 +81,11 @@ export const financeService = {
       .order('transaction_date', { ascending: false });
 
     if (error) {
+      if (error.code === '42P01' || error.message.includes('does not exist') || error.message.includes('404')) {
+        return localDemoTransactions
+          .filter(t => t.church_id === churchId)
+          .sort((a, b) => new Date(b.transaction_date).getTime() - new Date(a.transaction_date).getTime());
+      }
       throw new Error(`Erreur lors du chargement des transactions : ${error.message}`);
     }
 

@@ -23,6 +23,9 @@ export const pastoralService = {
       .order('created_at', { ascending: false });
 
     if (error) {
+      if (error.code === '42P01' || error.message.includes('does not exist') || error.message.includes('404')) {
+        return localDemoRecords.filter(r => r.church_id === churchId);
+      }
       throw new Error(`Accès restreint ou erreur pastoral : ${error.message}`);
     }
 

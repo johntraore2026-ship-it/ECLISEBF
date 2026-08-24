@@ -21,6 +21,9 @@ export const departmentGroupService = {
       .order('name');
 
     if (error) {
+      if (error.code === '42P01' || error.message.includes('does not exist') || error.message.includes('404')) {
+        return localDemoDepartments.filter(d => d.church_id === churchId);
+      }
       throw new Error(`Erreur départements : ${error.message}`);
     }
 
@@ -74,6 +77,9 @@ export const departmentGroupService = {
       .order('name');
 
     if (error) {
+      if (error.code === '42P01' || error.message.includes('does not exist') || error.message.includes('404')) {
+        return localDemoGroups.filter(g => g.church_id === churchId);
+      }
       throw new Error(`Erreur groupes : ${error.message}`);
     }
 

@@ -81,6 +81,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setCurrentChurch(churchData as Church);
           }
         }
+      } else {
+        // Fallback for new users before profile record is created or if RLS restricts query
+        const meta = activeUser.user_metadata || {};
+        const fallbackProfile: Profile = {
+          id: activeUser.id,
+          church_id: DEMO_CHURCH.id,
+          first_name: (meta.first_name as string) || activeUser.email?.split('@')[0] || 'Responsable',
+          last_name: (meta.last_name as string) || '',
+          email: activeUser.email,
+          phone: meta.phone as string | undefined,
+          status: 'ACTIVE',
+          created_at: activeUser.created_at || new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+        setProfile(fallbackProfile);
+        setChurchId(DEMO_CHURCH.id);
+        setCurrentChurch(DEMO_CHURCH);
       }
 
       // 2. Fetch User Roles & Permissions
@@ -100,7 +117,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         `)
         .eq('user_id', activeUser.id);
 
-      if (!rolesError && userRolesData) {
+      if (!rolesError && userRolesData && userRolesData.length > 0) {
         const parsedRoles: Role[] = [];
         const parsedPermissions: Permission[] = [];
 
@@ -126,6 +143,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         setRoles(parsedRoles);
         setPermissions(parsedPermissions);
+      } else {
+        // Default role when no explicit user_roles exist in Supabase
+        const defaultRole = DEMO_ROLES.find(r => r.code === 'CHURCH_ADMIN') || DEMO_ROLES[1];
+        setRoles([defaultRole]);
+        setPermissions(DEMO_PERMISSIONS);
       }
     } catch (err) {
       console.error('Initialization error in loadSupabaseUserData:', err);
@@ -213,13 +235,53 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
     setLoading(true);
-    const { error } = await supabase.auth.signUp({
-      email,
-      password: pass,
-      options: { data: metadata }
-    });
-    setLoading(false);
-    if (error) throw new Error(error.message);
+    try {
+      // Ensure data is always a valid key-value map object for Supabase GoTrue backend
+      const userMetadata: Record<string, unknown> = 
+        typeof metadata === 'object' && metadata !== null && !Array.isArray(metadata)
+          ? metadata
+          : {};
+
+      const { data, error } = await supabase.auth.signUp({
+        email: email.trim(),
+        password: pass,
+        options: {
+          data: userMetadata
+        }
+      });
+
+      if (error) throw new Error(error.message);
+
+      // If user is returned and session exists, ensure profile record is created
+      if (data?.user) {
+        try {
+          const firstName = (userMetadata.first_name as string) || email.split('@')[0] || 'Responsable';
+          const lastName = (userMetadata.last_name as string) || '';
+          const phone = (userMetadata.phone as string) || null;
+
+          // Check if there is an existing church to link by default
+          const { data: defaultChurch } = await supabase
+            .from('churches')
+            .select('id')
+            .limit(1)
+            .maybeSingle();
+
+          await supabase.from('profiles').upsert({
+            id: data.user.id,
+            email: data.user.email,
+            first_name: firstName,
+            last_name: lastName,
+            phone: phone,
+            church_id: defaultChurch?.id || null,
+            status: 'ACTIVE'
+          }, { onConflict: 'id' });
+        } catch (profileErr) {
+          console.warn('Auto profile initialization notice:', profileErr);
+        }
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   const signOut = async () => {

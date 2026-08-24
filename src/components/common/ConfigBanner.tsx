@@ -14,25 +14,25 @@ export const ConfigBanner: React.FC<{ onOpenSqlModal?: () => void }> = ({ onOpen
 
   if (isConfigured && !isDemoMode) {
     return (
-      <div id="live-supabase-banner" className="bg-emerald-900/90 text-emerald-100 px-4 py-2 text-xs flex flex-wrap items-center justify-between gap-3 border-b border-emerald-700">
-        <div className="flex items-center gap-2">
-          <span className="flex h-2 w-2 relative">
+      <div id="live-supabase-banner" className="bg-slate-900 text-slate-200 px-4 py-2 text-xs flex flex-wrap items-center justify-between gap-3 border-b border-emerald-800/60 shadow-md">
+        <div className="flex items-center gap-2.5">
+          <span className="flex h-2.5 w-2.5 relative">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
+            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-400"></span>
           </span>
-          <span className="font-semibold tracking-wide">CONNECTÉ EN DIRECT À SUPABASE POSTGRESQL & AUTH</span>
-          <span className="text-emerald-300">|</span>
-          <span className="text-emerald-200">Isolation multi-tenant & Row Level Security (RLS) actives</span>
+          <span className="font-semibold tracking-wide text-emerald-300">SESSION AUTH SUPABASE ACTIVE</span>
+          <span className="text-slate-600 hidden sm:inline">|</span>
+          <span className="text-slate-300 hidden sm:inline">Pour enregistrer durablement les données, activez vos tables PostgreSQL via le script SQL.</span>
         </div>
         <div className="flex items-center gap-2">
           {onOpenSqlModal && (
             <button
               onClick={onOpenSqlModal}
               id="view-sql-schema-btn"
-              className="text-xs bg-emerald-800 hover:bg-emerald-700 text-white px-2.5 py-1 rounded transition flex items-center gap-1.5"
+              className="text-xs bg-emerald-700 hover:bg-emerald-600 text-white font-medium px-3 py-1 rounded-lg transition flex items-center gap-1.5 shadow-sm"
             >
-              <Database className="w-3.5 h-3.5" />
-              Schéma SQL & RLS
+              <Database className="w-3.5 h-3.5 text-emerald-200" />
+              <span>Copier le Script SQL (1-Clic)</span>
             </button>
           )}
         </div>
