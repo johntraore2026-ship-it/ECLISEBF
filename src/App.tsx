@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { ThemeProvider } from './contexts/ThemeContext';
+import { ToastProvider } from './contexts/ToastContext';
+import { HelpFloatingButton } from './components/layout/HelpFloatingButton';
 import { Navbar } from './components/layout/Navbar';
 import { Sidebar } from './components/layout/Sidebar';
 import { ConfigBanner } from './components/common/ConfigBanner';
@@ -222,14 +225,26 @@ const MainAppContent: React.FC = () => {
         onOpenAddFinance={() => setShowFinanceModal(true)}
       />
 
+      {/* Help & Shortcuts Floating Button */}
+      <HelpFloatingButton
+        onOpenAddMember={handleOpenAddMember}
+        onOpenAddFinance={() => setShowFinanceModal(true)}
+        onOpenAddAttendance={() => setShowAttendanceModal(true)}
+        setActiveTab={setActiveTab}
+      />
+
     </div>
   );
 };
 
 export default function App() {
   return (
-    <AuthProvider>
-      <MainAppContent />
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <ToastProvider>
+          <MainAppContent />
+        </ToastProvider>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
