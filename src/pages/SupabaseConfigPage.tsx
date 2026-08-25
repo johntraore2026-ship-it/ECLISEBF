@@ -5,25 +5,26 @@ import {
   AlertTriangle,
   Copy,
   Check,
-  Download,
   ExternalLink,
-  Shield,
   Server,
-  Lock,
-  Key,
-  Layers,
-  ArrowRight
+  Key
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { RolePermissionsManager } from '../components/config/RolePermissionsManager';
+import { getActiveSupabaseConfig } from '../lib/supabase';
 
 interface SupabaseConfigPageProps {
   onOpenSqlModal: () => void;
+  onOpenCredentialsModal?: () => void;
 }
 
-export const SupabaseConfigPage: React.FC<SupabaseConfigPageProps> = ({ onOpenSqlModal }) => {
-  const { isConfigured, isDemoMode, setDemoMode, demoRole, setDemoRole } = useAuth();
+export const SupabaseConfigPage: React.FC<SupabaseConfigPageProps> = ({
+  onOpenSqlModal,
+  onOpenCredentialsModal
+}) => {
+  const { isConfigured, isDemoMode, demoRole, setDemoRole } = useAuth();
   const [copiedEnv, setCopiedEnv] = useState(false);
+  const activeConfig = getActiveSupabaseConfig();
 
   const envSample = `# Configuration Backend Obligatoire Supabase
 VITE_SUPABASE_URL=https://votre-projet.supabase.co
@@ -50,14 +51,26 @@ VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...`;
           </p>
         </div>
 
-        <button
-          onClick={onOpenSqlModal}
-          id="config-open-sql-btn"
-          className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow transition"
-        >
-          <Database className="w-4 h-4" />
-          Afficher Schéma SQL & RLS
-        </button>
+        <div className="flex items-center gap-2">
+          {onOpenCredentialsModal && (
+            <button
+              onClick={onOpenCredentialsModal}
+              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition"
+            >
+              <Key className="w-4 h-4 text-emerald-400" />
+              Configurer / Modifier Clés
+            </button>
+          )}
+
+          <button
+            onClick={onOpenSqlModal}
+            id="config-open-sql-btn"
+            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow transition"
+          >
+            <Database className="w-4 h-4" />
+            Afficher Schéma SQL & RLS
+          </button>
+        </div>
       </div>
 
       {/* Backend Status Card */}
@@ -82,18 +95,24 @@ VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...`;
             <div className="flex justify-between py-1 border-b border-slate-800">
               <span className="text-slate-400">URL Supabase :</span>
               <span className="font-mono text-emerald-400 truncate max-w-[200px]">
-                {import.meta.env.VITE_SUPABASE_URL || 'Non renseignée (.env)'}
+                {activeConfig.url || 'Non renseignée'}
               </span>
             </div>
             <div className="flex justify-between py-1 border-b border-slate-800">
               <span className="text-slate-400">Clé Publique Anon :</span>
               <span className="font-mono text-slate-300">
-                {import.meta.env.VITE_SUPABASE_ANON_KEY ? '••••••••••••••••' : 'Non renseignée (.env)'}
+                {activeConfig.key ? '••••••••••••••••' : 'Non renseignée'}
               </span>
             </div>
             <div className="flex justify-between py-1 border-b border-slate-800">
-              <span className="text-slate-400">Moteur Base de Données :</span>
-              <span className="text-white font-medium">PostgreSQL 15+ (Supabase)</span>
+              <span className="text-slate-400">Source des Clés :</span>
+              <span className="text-white font-medium">
+                {activeConfig.isCustomStored
+                  ? 'LocalStorage (Navigateur)'
+                  : activeConfig.isFromEnv
+                  ? '.env (Compile Time)'
+                  : 'Non Définie'}
+              </span>
             </div>
             <div className="flex justify-between py-1">
               <span className="text-slate-400">Politiques RLS :</span>

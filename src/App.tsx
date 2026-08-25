@@ -27,6 +27,7 @@ import { FinanceTransactionModal } from './components/modals/FinanceTransactionM
 import { AttendanceModal } from './components/modals/AttendanceModal';
 import { PastoralRecordModal } from './components/modals/PastoralRecordModal';
 import { SqlScriptModal } from './components/modals/SqlScriptModal';
+import { SupabaseCredentialsModal } from './components/modals/SupabaseCredentialsModal';
 import { QuickActionFloatingButton } from './components/layout/QuickActionFloatingButton';
 import { Member } from './types';
 
@@ -43,6 +44,7 @@ const MainAppContent: React.FC = () => {
   const [showAttendanceModal, setShowAttendanceModal] = useState(false);
   const [showPastoralModal, setShowPastoralModal] = useState(false);
   const [showSqlModal, setShowSqlModal] = useState(false);
+  const [showCredentialsModal, setShowCredentialsModal] = useState(false);
 
   // Key to force refresh after save
   const [refreshKey, setRefreshKey] = useState(0);
@@ -58,6 +60,9 @@ const MainAppContent: React.FC = () => {
         />
         {showSqlModal && (
           <SqlScriptModal isOpen={showSqlModal} onClose={() => setShowSqlModal(false)} />
+        )}
+        {showCredentialsModal && (
+          <SupabaseCredentialsModal isOpen={showCredentialsModal} onClose={() => setShowCredentialsModal(false)} />
         )}
       </>
     );
@@ -84,7 +89,10 @@ const MainAppContent: React.FC = () => {
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-emerald-500 selection:text-white">
       
       {/* Top Supabase Live/Demo Status Banner */}
-      <ConfigBanner onOpenSqlModal={() => setShowSqlModal(true)} />
+      <ConfigBanner
+        onOpenSqlModal={() => setShowSqlModal(true)}
+        onOpenCredentialsModal={() => setShowCredentialsModal(true)}
+      />
 
       {/* Main Navbar */}
       <Navbar
@@ -174,7 +182,10 @@ const MainAppContent: React.FC = () => {
               {activeTab === 'audit' && <AuditPage key={refreshKey} />}
 
               {activeTab === 'config' && (
-                <SupabaseConfigPage onOpenSqlModal={() => setShowSqlModal(true)} />
+                <SupabaseConfigPage
+                  onOpenSqlModal={() => setShowSqlModal(true)}
+                  onOpenCredentialsModal={() => setShowCredentialsModal(true)}
+                />
               )}
             </>
           )}
@@ -215,6 +226,11 @@ const MainAppContent: React.FC = () => {
       <SqlScriptModal
         isOpen={showSqlModal}
         onClose={() => setShowSqlModal(false)}
+      />
+
+      <SupabaseCredentialsModal
+        isOpen={showCredentialsModal}
+        onClose={() => setShowCredentialsModal(false)}
       />
 
       {/* Global Quick Action Floating Button */}

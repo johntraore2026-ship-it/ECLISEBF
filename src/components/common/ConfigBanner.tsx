@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
-import { AlertTriangle, Database, CheckCircle2, Copy, Check, ExternalLink, ShieldCheck, Sparkles } from 'lucide-react';
+import { AlertTriangle, Database, CheckCircle2, Copy, Check, Key } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
-export const ConfigBanner: React.FC<{ onOpenSqlModal?: () => void }> = ({ onOpenSqlModal }) => {
+export const ConfigBanner: React.FC<{
+  onOpenSqlModal?: () => void;
+  onOpenCredentialsModal?: () => void;
+}> = ({ onOpenSqlModal, onOpenCredentialsModal }) => {
   const { isConfigured, isDemoMode, setDemoMode, demoRole, setDemoRole } = useAuth();
   const [copied, setCopied] = useState(false);
 
@@ -25,6 +28,15 @@ export const ConfigBanner: React.FC<{ onOpenSqlModal?: () => void }> = ({ onOpen
           <span className="text-slate-300 hidden sm:inline">Pour enregistrer durablement les données, activez vos tables PostgreSQL via le script SQL.</span>
         </div>
         <div className="flex items-center gap-2">
+          {onOpenCredentialsModal && (
+            <button
+              onClick={onOpenCredentialsModal}
+              className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium px-3 py-1 rounded-lg border border-slate-700 transition flex items-center gap-1.5 shadow-sm"
+            >
+              <Key className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Gérer Clés Supabase</span>
+            </button>
+          )}
           {onOpenSqlModal && (
             <button
               onClick={onOpenSqlModal}
@@ -32,7 +44,7 @@ export const ConfigBanner: React.FC<{ onOpenSqlModal?: () => void }> = ({ onOpen
               className="text-xs bg-emerald-700 hover:bg-emerald-600 text-white font-medium px-3 py-1 rounded-lg transition flex items-center gap-1.5 shadow-sm"
             >
               <Database className="w-3.5 h-3.5 text-emerald-200" />
-              <span>Copier le Script SQL (1-Clic)</span>
+              <span>Script SQL (1-Clic)</span>
             </button>
           )}
         </div>
@@ -55,12 +67,22 @@ export const ConfigBanner: React.FC<{ onOpenSqlModal?: () => void }> = ({ onOpen
               <span className="font-medium">Backend Supabase non encore connecté</span>
             </div>
             <p className="text-amber-300/80 text-[11px] mt-0.5">
-              Renseignez <code className="bg-amber-900/60 px-1 py-0.5 rounded font-mono text-amber-200">VITE_SUPABASE_URL</code> et <code className="bg-amber-900/60 px-1 py-0.5 rounded font-mono text-amber-200">VITE_SUPABASE_ANON_KEY</code> pour passer en production réelle.
+              Saisissez vos clés via le bouton <strong>"Renseigner les Clés"</strong> ou redéployez Vercel si vous venez d'ajouter les variables d'environnement.
             </p>
           </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {onOpenCredentialsModal && (
+            <button
+              onClick={onOpenCredentialsModal}
+              className="bg-emerald-700 hover:bg-emerald-600 text-white font-semibold px-3 py-1 rounded transition flex items-center gap-1.5 shadow-sm"
+            >
+              <Key className="w-3.5 h-3.5" />
+              Renseigner les Clés Supabase
+            </button>
+          )}
+
           {/* Demo Role Switcher */}
           <div className="flex items-center bg-amber-900/60 border border-amber-700/60 rounded px-2 py-1 gap-1.5">
             <span className="text-[10px] uppercase text-amber-400 font-semibold">Rôle Test :</span>
@@ -84,10 +106,10 @@ export const ConfigBanner: React.FC<{ onOpenSqlModal?: () => void }> = ({ onOpen
             <button
               onClick={onOpenSqlModal}
               id="view-sql-schema-btn"
-              className="bg-amber-700 hover:bg-amber-600 text-white font-medium px-2.5 py-1 rounded transition flex items-center gap-1"
+              className="bg-amber-900/80 hover:bg-amber-800 text-amber-200 font-medium px-2.5 py-1 rounded border border-amber-700/60 transition flex items-center gap-1"
             >
               <Database className="w-3.5 h-3.5" />
-              Schéma SQL Supabase
+              Schéma SQL
             </button>
           )}
 
@@ -97,10 +119,11 @@ export const ConfigBanner: React.FC<{ onOpenSqlModal?: () => void }> = ({ onOpen
             className="bg-amber-900/80 hover:bg-amber-800 text-amber-200 px-2.5 py-1 rounded border border-amber-700/60 transition flex items-center gap-1"
           >
             {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-            {copied ? 'Copié !' : 'Variables .env'}
+            {copied ? 'Copié !' : 'Modèle .env'}
           </button>
         </div>
       </div>
     </div>
   );
 };
+

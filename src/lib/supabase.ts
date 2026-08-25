@@ -1,8 +1,40 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-// Environment variables
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+// Get credentials from localStorage override OR build-time import.meta.env
+const getCredential = (key: string): string => {
+  if (typeof window !== 'undefined') {
+    try {
+      const stored = localStorage.getItem(key);
+      if (stored && stored.trim() !== '') {
+        return stored.trim();
+      }
+    } catch {
+      // Ignore localStorage access errors if restricted
+    }
+  }
+  const envVal = import.meta.env[key];
+  if (envVal && typeof envVal === 'string' && envVal.trim() !== '') {
+    return envVal.trim();
+  }
+  return '';
+};
+
+export const getActiveSupabaseConfig = () => {
+  const url = getCredential('VITE_SUPABASE_URL');
+  const key = getCredential('VITE_SUPABASE_ANON_KEY');
+  const isCustomStored = typeof window !== 'undefined' && Boolean(localStorage.getItem('VITE_SUPABASE_URL'));
+  return {
+    url,
+    key,
+    isCustomStored,
+    isFromEnv: Boolean(import.meta.env.VITE_SUPABASE_URL)
+  };
+};
+
+const activeConfig = getActiveSupabaseConfig();
+
+export const supabaseUrl = activeConfig.url;
+export const supabaseAnonKey = activeConfig.key;
 
 // Check if credentials are provided and non-empty
 export const isSupabaseConfigured = Boolean(
@@ -12,6 +44,24 @@ export const isSupabaseConfigured = Boolean(
   supabaseAnonKey.trim() !== '' &&
   supabaseUrl.startsWith('http')
 );
+
+// Save runtime credentials to localStorage
+export function saveRuntimeSupabaseConfig(url: string, key: string): void {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('VITE_SUPABASE_URL', url.trim());
+    localStorage.setItem('VITE_SUPABASE_ANON_KEY', key.trim());
+    window.location.reload();
+  }
+}
+
+// Clear runtime credentials from localStorage
+export function clearRuntimeSupabaseConfig(): void {
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem('VITE_SUPABASE_URL');
+    localStorage.removeItem('VITE_SUPABASE_ANON_KEY');
+    window.location.reload();
+  }
+}
 
 // Centralized Supabase Client
 export const supabase: SupabaseClient = isSupabaseConfigured
@@ -34,7 +84,7 @@ export const supabase: SupabaseClient = isSupabaseConfigured
       }
     );
 
-export const SUPABASE_CONFIG_MESSAGE = "Configuration Supabase requise. Veuillez renseigner VITE_SUPABASE_URL et VITE_SUPABASE_ANON_KEY dans vos variables d'environnement.";
+export const SUPABASE_CONFIG_MESSAGE = "Configuration Supabase requise. Veuillez renseigner VITE_SUPABASE_URL et VITE_SUPABASE_ANON_KEY dans vos variables d'environnement ou dans l'interface de l'application.";
 
 /**
  * Helper to check if a Supabase error is caused by a missing table, relation, or schema cache issue
