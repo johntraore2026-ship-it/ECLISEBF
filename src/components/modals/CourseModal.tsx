@@ -38,6 +38,19 @@ export const CourseModal: React.FC<CourseModalProps> = ({
   const [videoUrl, setVideoUrl] = useState('');
   const [audioUrl, setAudioUrl] = useState('');
 
+  React.useEffect(() => {
+    if (isOpen) {
+      setTab('COURSE');
+      setLoading(false);
+    }
+  }, [isOpen]);
+
+  React.useEffect(() => {
+    if (existingCourses.length > 0 && (!selectedCourseId || !existingCourses.some(c => c.id === selectedCourseId))) {
+      setSelectedCourseId(existingCourses[0].id);
+    }
+  }, [existingCourses, selectedCourseId]);
+
   if (!isOpen) return null;
 
   const handleSubmitCourse = async (e: React.FormEvent) => {
@@ -48,7 +61,7 @@ export const CourseModal: React.FC<CourseModalProps> = ({
     try {
       const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-');
       await onSaveCourse({
-        church_id: churchId,
+        church_id: churchId || 'ch-1',
         title: title.trim(),
         slug,
         description: description.trim(),
@@ -111,8 +124,8 @@ export const CourseModal: React.FC<CourseModalProps> = ({
               <GraduationCap className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-bold text-base text-white">Alimentation des Formations</h3>
-              <p className="text-xs text-slate-400">Créer un cursus ou ajouter un module de cours</p>
+              <h3 className="font-bold text-base text-white">Créer une Formation</h3>
+              <p className="text-xs text-slate-400">Créer un nouveau cursus de formation ou ajouter un module de cours</p>
             </div>
           </div>
           <button

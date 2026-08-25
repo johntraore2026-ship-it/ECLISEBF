@@ -17,13 +17,16 @@ import {
   Layers,
   ShieldCheck,
   AlertCircle,
-  Download
+  Download,
+  QrCode
 } from 'lucide-react';
 import { FinanceTransaction, FinanceCategory, TransactionType } from '../types';
 import { financeService, FinanceSummary } from '../services/financeService';
 import { useAuth } from '../contexts/AuthContext';
 import { exportFinanceReportToCSV } from '../utils/csvExport';
 import { FinanceChartsSection } from '../components/finance/FinanceChartsSection';
+import { PaymentQrSection } from '../components/finance/PaymentQrSection';
+import { Skeleton, CardGridSkeleton } from '../components/common/Skeleton';
 
 interface FinancePageProps {
   onOpenAddFinance: () => void;
@@ -36,7 +39,7 @@ export const FinancePage: React.FC<FinancePageProps> = ({ onOpenAddFinance }) =>
   const [summary, setSummary] = useState<FinanceSummary | null>(null);
   const [categories, setCategories] = useState<FinanceCategory[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filterTab, setFilterTab] = useState<'ALL' | 'INCOME' | 'EXPENSE' | 'PENDING'>('ALL');
+  const [filterTab, setFilterTab] = useState<'ALL' | 'INCOME' | 'EXPENSE' | 'PENDING' | 'QR_PAYMENTS'>('ALL');
   const [paymentFilter, setPaymentFilter] = useState<string>('ALL');
   const [selectedTxForReceipt, setSelectedTxForReceipt] = useState<FinanceTransaction | null>(null);
 
@@ -251,6 +254,15 @@ export const FinancePage: React.FC<FinancePageProps> = ({ onOpenAddFinance }) =>
             <Clock className="w-3.5 h-3.5" />
             Circuit d'Approbation ({summary?.pendingApprovalsCount || 0})
           </button>
+          <button
+            onClick={() => setFilterTab('QR_PAYMENTS')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1 ${
+              filterTab === 'QR_PAYMENTS' ? 'bg-emerald-600 text-white font-bold' : 'text-slate-300 hover:text-white bg-slate-800'
+            }`}
+          >
+            <QrCode className="w-3.5 h-3.5 text-emerald-400" />
+            Paiement Mobile & QR Codes
+          </button>
         </div>
 
         <div>
@@ -270,8 +282,16 @@ export const FinancePage: React.FC<FinancePageProps> = ({ onOpenAddFinance }) =>
         </div>
       </div>
 
-      {/* Transactions Table */}
-      <div className="bg-slate-900/90 border border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+      {/* Content Rendering: Either Payment QR Code Generator or Transactions Table */}
+      {filterTab === 'QR_PAYMENTS' ? (
+        <PaymentQrSection />
+      ) : loading ? (
+        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6">
+          <Skeleton variant="table-row" count={6} />
+        </div>
+      ) : (
+        /* Transactions Table */
+        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead className="bg-slate-850 border-b border-slate-800 text-slate-400 font-semibold uppercase text-[10px] tracking-wider">
@@ -375,6 +395,7 @@ export const FinancePage: React.FC<FinancePageProps> = ({ onOpenAddFinance }) =>
           </table>
         </div>
       </div>
+      )}
 
       {/* Receipt Modal Preview */}
       {selectedTxForReceipt && (

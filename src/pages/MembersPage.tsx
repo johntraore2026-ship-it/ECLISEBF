@@ -24,6 +24,7 @@ import { departmentGroupService } from '../services/departmentGroupService';
 import { useAuth } from '../contexts/AuthContext';
 import { MemberFilterToolbar, MemberFiltersState } from '../components/members/MemberFilterToolbar';
 import { exportMembersToCSV } from '../utils/csvExport';
+import { Skeleton } from '../components/common/Skeleton';
 
 interface MembersPageProps {
   onOpenAddMember: () => void;
@@ -276,7 +277,13 @@ export const MembersPage: React.FC<MembersPageProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800">
-                {filteredMembers.length === 0 ? (
+                {loading ? (
+                  <tr>
+                    <td colSpan={4} className="p-4">
+                      <Skeleton variant="table-row" count={5} />
+                    </td>
+                  </tr>
+                ) : filteredMembers.length === 0 ? (
                   <tr>
                     <td colSpan={4} className="py-12 text-center text-slate-500">
                       <Users className="w-8 h-8 mx-auto mb-2 opacity-40" />

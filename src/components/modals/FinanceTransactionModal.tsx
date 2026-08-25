@@ -34,6 +34,58 @@ export const FinanceTransactionModal: React.FC<FinanceTransactionModalProps> = (
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [draftRestored, setDraftRestored] = useState(false);
+
+  // Restore draft when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      const savedDraft = localStorage.getItem('eglisebf_draft_finance');
+      if (savedDraft) {
+        try {
+          const parsed = JSON.parse(savedDraft);
+          if (parsed && (parsed.amount || parsed.description)) {
+            if (parsed.type) setType(parsed.type);
+            if (parsed.amount) setAmount(parsed.amount);
+            if (parsed.description) setDescription(parsed.description);
+            if (parsed.paymentMethod) setPaymentMethod(parsed.paymentMethod);
+            if (parsed.referenceNumber) setReferenceNumber(parsed.referenceNumber);
+            if (parsed.donorName) setDonorName(parsed.donorName);
+            if (parsed.categoryId) setCategoryId(parsed.categoryId);
+            setDraftRestored(true);
+          }
+        } catch (e) {
+          console.error('Error parsing finance draft', e);
+        }
+      }
+    }
+  }, [isOpen]);
+
+  // Save draft on state change
+  useEffect(() => {
+    if (isOpen && (amount || description || referenceNumber || donorName)) {
+      localStorage.setItem(
+        'eglisebf_draft_finance',
+        JSON.stringify({
+          type,
+          amount,
+          description,
+          paymentMethod,
+          referenceNumber,
+          donorName,
+          categoryId,
+        })
+      );
+    }
+  }, [isOpen, type, amount, description, paymentMethod, referenceNumber, donorName, categoryId]);
+
+  const clearFinanceDraft = () => {
+    localStorage.removeItem('eglisebf_draft_finance');
+    setDraftRestored(false);
+    setAmount('');
+    setDescription('');
+    setReferenceNumber('');
+    setDonorName('');
+  };
 
   useEffect(() => {
     if (!churchId || !isOpen) return;
@@ -95,6 +147,7 @@ export const FinanceTransactionModal: React.FC<FinanceTransactionModalProps> = (
         'Transaction Comptable Enregistrée'
       );
 
+      localStorage.removeItem('eglisebf_draft_finance');
       onTransactionSaved();
       onClose();
     } catch (err: any) {
@@ -129,6 +182,22 @@ export const FinanceTransactionModal: React.FC<FinanceTransactionModalProps> = (
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          {draftRestored && (
+            <div className="bg-emerald-950/80 border border-emerald-800 text-emerald-200 text-xs p-3 rounded-xl flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Save className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>Brouillon financier non soumis restauré.</span>
+              </div>
+              <button
+                type="button"
+                onClick={clearFinanceDraft}
+                className="text-[11px] underline font-semibold text-emerald-400 hover:text-white"
+              >
+                Effacer
+              </button>
+            </div>
+          )}
+
           {error && (
             <div className="bg-red-950/80 border border-red-800 text-red-200 text-xs p-3 rounded-lg flex items-center gap-2">
               <AlertCircle className="w-4 h-4 shrink-0 text-red-400" />

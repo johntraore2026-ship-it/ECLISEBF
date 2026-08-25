@@ -10,7 +10,9 @@ import {
   Layers,
   MapPin,
   RefreshCw,
-  Sliders
+  Sliders,
+  Maximize,
+  Minimize
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { churchService } from '../../services/churchService';
@@ -45,6 +47,27 @@ export const Navbar: React.FC<NavbarProps> = ({
   const [churches, setChurches] = useState<Church[]>([]);
   const [churchDropdownOpen, setChurchDropdownOpen] = useState(false);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch((err) => {
+        console.error('Error attempting to enable fullscreen:', err);
+      });
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen().catch(console.error);
+      }
+    }
+  };
 
   useEffect(() => {
     churchService.listChurches(isDemoMode).then(setChurches).catch(console.error);
@@ -153,6 +176,20 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Right actions: Profile, RLS indicator, user */}
           <div className="flex items-center gap-2 sm:gap-3">
             
+            {/* Fullscreen Toggle Button for Pastoral Presentations */}
+            <button
+              onClick={toggleFullscreen}
+              id="header-fullscreen-toggle-btn"
+              title={isFullscreen ? "Quitter le Mode Plein Écran" : "Basculer en Mode Plein Écran (Présentations Pastorales)"}
+              className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-emerald-400 rounded-lg border border-slate-700 transition flex items-center justify-center"
+            >
+              {isFullscreen ? (
+                <Minimize className="w-4 h-4 text-emerald-400" />
+              ) : (
+                <Maximize className="w-4 h-4" />
+              )}
+            </button>
+
             {/* Supabase Schema / RLS quick button */}
             <button
               onClick={onOpenSqlModal}

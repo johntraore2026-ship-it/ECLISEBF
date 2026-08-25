@@ -43,11 +43,28 @@ export const MemberModal: React.FC<MemberModalProps> = ({
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [draftRestored, setDraftRestored] = useState(false);
 
+  // Auto-load draft from localStorage when opening modal for NEW member
   useEffect(() => {
     if (memberToEdit) {
       setFormData(memberToEdit);
-    } else {
+      setDraftRestored(false);
+    } else if (isOpen) {
+      const savedDraft = localStorage.getItem('eglisebf_draft_member');
+      if (savedDraft) {
+        try {
+          const parsed = JSON.parse(savedDraft);
+          if (parsed && (parsed.first_name || parsed.last_name || parsed.phone)) {
+            setFormData(parsed);
+            setDraftRestored(true);
+            return;
+          }
+        } catch (e) {
+          console.error('Failed to parse member draft', e);
+        }
+      }
+      setDraftRestored(false);
       setFormData({
         first_name: '',
         last_name: '',
@@ -69,6 +86,39 @@ export const MemberModal: React.FC<MemberModalProps> = ({
       });
     }
   }, [memberToEdit, isOpen]);
+
+  // Auto-save draft on form change
+  useEffect(() => {
+    if (isOpen && !memberToEdit) {
+      if (formData.first_name || formData.last_name || formData.phone || formData.email || formData.notes) {
+        localStorage.setItem('eglisebf_draft_member', JSON.stringify(formData));
+      }
+    }
+  }, [formData, isOpen, memberToEdit]);
+
+  const clearDraft = () => {
+    localStorage.removeItem('eglisebf_draft_member');
+    setDraftRestored(false);
+    setFormData({
+      first_name: '',
+      last_name: '',
+      gender: 'MALE',
+      phone: '',
+      email: '',
+      birth_date: '',
+      profession: '',
+      address: '',
+      neighborhood: '',
+      city: 'Ouagadougou',
+      marital_status: 'SINGLE',
+      spiritual_status: 'COMMUNICANT',
+      baptism_date: '',
+      baptism_place: '',
+      join_date: new Date().toISOString().split('T')[0],
+      is_active: true,
+      notes: '',
+    });
+  };
 
   if (!isOpen || !churchId) return null;
 
@@ -116,6 +166,7 @@ export const MemberModal: React.FC<MemberModalProps> = ({
         );
       }
 
+      localStorage.removeItem('eglisebf_draft_member');
       onMemberSaved();
       onClose();
     } catch (err: any) {
@@ -152,6 +203,22 @@ export const MemberModal: React.FC<MemberModalProps> = ({
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+          {draftRestored && (
+            <div className="bg-emerald-950/80 border border-emerald-800 text-emerald-200 text-xs p-3 rounded-xl flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Save className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>Brouillon non soumis restauré automatiquement depuis la mémoire locale.</span>
+              </div>
+              <button
+                type="button"
+                onClick={clearDraft}
+                className="text-[11px] underline font-semibold text-emerald-400 hover:text-white"
+              >
+                Effacer le brouillon
+              </button>
+            </div>
+          )}
+
           {error && (
             <div className="bg-red-950/80 border border-red-800 text-red-200 text-xs p-3 rounded-lg flex items-center gap-2">
               <AlertCircle className="w-4 h-4 shrink-0 text-red-400" />

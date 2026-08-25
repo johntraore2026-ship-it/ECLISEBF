@@ -13,11 +13,13 @@ import {
 import { ChurchEvent, Announcement } from '../types';
 import { eventAnnouncementService } from '../services/eventAnnouncementService';
 import { useAuth } from '../contexts/AuthContext';
+import { ChurchCalendar } from '../components/events/ChurchCalendar';
+import { CardGridSkeleton, Skeleton } from '../components/common/Skeleton';
 
 export const EventsPage: React.FC = () => {
   const { churchId, isDemoMode } = useAuth();
 
-  const [activeTab, setActiveTab] = useState<'EVENTS' | 'ANNOUNCEMENTS'>('EVENTS');
+  const [activeTab, setActiveTab] = useState<'EVENTS' | 'CALENDAR' | 'ANNOUNCEMENTS'>('CALENDAR');
   const [events, setEvents] = useState<ChurchEvent[]>([]);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [loading, setLoading] = useState(true);
@@ -109,24 +111,36 @@ export const EventsPage: React.FC = () => {
       </div>
 
       {/* Tabs */}
-      <div className="flex items-center gap-2 border-b border-slate-800 pb-2">
+      <div className="flex flex-wrap items-center gap-2 border-b border-slate-800 pb-2">
+        <button
+          onClick={() => setActiveTab('CALENDAR')}
+          className={`px-4 py-2 text-xs font-semibold rounded-xl flex items-center gap-2 transition ${
+            activeTab === 'CALENDAR'
+              ? 'bg-emerald-600 text-white font-bold shadow'
+              : 'bg-slate-800 text-slate-300 hover:text-white'
+          }`}
+        >
+          <CalendarIcon className="w-4 h-4 text-emerald-400" />
+          Calendrier Ecclésiastique (Mois/Semaine)
+        </button>
+
         <button
           onClick={() => setActiveTab('EVENTS')}
           className={`px-4 py-2 text-xs font-semibold rounded-xl flex items-center gap-2 transition ${
             activeTab === 'EVENTS'
-              ? 'bg-emerald-600 text-white'
+              ? 'bg-emerald-600 text-white font-bold shadow'
               : 'bg-slate-800 text-slate-300 hover:text-white'
           }`}
         >
-          <CalendarIcon className="w-4 h-4" />
-          Événements & Programmes ({events.length})
+          <Sparkles className="w-4 h-4" />
+          Liste des Événements ({events.length})
         </button>
 
         <button
           onClick={() => setActiveTab('ANNOUNCEMENTS')}
           className={`px-4 py-2 text-xs font-semibold rounded-xl flex items-center gap-2 transition ${
             activeTab === 'ANNOUNCEMENTS'
-              ? 'bg-emerald-600 text-white'
+              ? 'bg-emerald-600 text-white font-bold shadow'
               : 'bg-slate-800 text-slate-300 hover:text-white'
           }`}
         >
@@ -135,8 +149,18 @@ export const EventsPage: React.FC = () => {
         </button>
       </div>
 
-      {/* Content */}
-      {activeTab === 'EVENTS' ? (
+      {/* Content Rendering */}
+      {loading ? (
+        <CardGridSkeleton cols={3} count={6} />
+      ) : activeTab === 'CALENDAR' ? (
+        <ChurchCalendar
+          events={events}
+          onOpenCreateModal={(defDate) => {
+            if (defDate) setStartDate(defDate);
+            setShowModal(true);
+          }}
+        />
+      ) : activeTab === 'EVENTS' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {events.map((evt) => (
             <div

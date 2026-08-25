@@ -18,11 +18,13 @@ import {
 import { Course, Lesson, CourseEnrollment } from '../types';
 import { trainingService } from '../services/trainingService';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../contexts/ToastContext';
 import { CourseModal } from '../components/modals/CourseModal';
 import { EnrollMemberModal } from '../components/modals/EnrollMemberModal';
 
 export const TrainingPage: React.FC = () => {
   const { churchId, isDemoMode, hasRole } = useAuth();
+  const { toast } = useToast();
 
   const [courses, setCourses] = useState<Course[]>([]);
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
@@ -34,24 +36,29 @@ export const TrainingPage: React.FC = () => {
 
   const canManageTraining = hasRole('SUPER_ADMIN') || hasRole('CHURCH_ADMIN') || hasRole('PASTOR') || hasRole('LEADER');
 
-  const loadCourses = async () => {
-    if (!churchId) return;
+  const loadCourses = async (preserveSelectedId?: string): Promise<Course[]> => {
+    const effectiveChurchId = churchId || 'ch-1';
     setLoading(true);
     try {
-      const data = await trainingService.getCourses(churchId, isDemoMode);
+      const data = await trainingService.getCourses(effectiveChurchId, isDemoMode);
       const enrs = await trainingService.getEnrollments(undefined, isDemoMode);
       setCourses(data);
       setEnrollments(enrs);
       if (data.length > 0) {
-        setSelectedCourse(data[0]);
-        const firstLesson = data[0].modules?.[0]?.lessons?.[0];
-        if (firstLesson) setSelectedLesson(firstLesson);
+        const target = preserveSelectedId
+          ? data.find(c => c.id === preserveSelectedId) || data[0]
+          : data[0];
+        setSelectedCourse(target);
+        const firstLesson = target.modules?.[0]?.lessons?.[0];
+        if (firstLesson && !selectedLesson) setSelectedLesson(firstLesson);
       } else {
         setSelectedCourse(null);
         setSelectedLesson(null);
       }
+      return data;
     } catch (err) {
       console.error(err);
+      return [];
     } finally {
       setLoading(false);
     }
@@ -68,21 +75,40 @@ export const TrainingPage: React.FC = () => {
   };
 
   const handleSaveCourse = async (courseData: Omit<Course, 'id' | 'created_at'>) => {
-    const newCourse = await trainingService.createCourse(courseData, isDemoMode);
-    await loadCourses();
-    setSelectedCourse(newCourse);
+    try {
+      const effectiveChurchId = courseData.church_id || churchId || 'ch-1';
+      const newCourse = await trainingService.createCourse(
+        { ...courseData, church_id: effectiveChurchId },
+        isDemoMode
+      );
+      const updatedList = await loadCourses(newCourse.id);
+      const created = updatedList.find(c => c.id === newCourse.id) || newCourse;
+      setSelectedCourse(created);
+      const firstLesson = created.modules?.[0]?.lessons?.[0] || null;
+      setSelectedLesson(firstLesson);
+      toast.success(`Cursus de formation "${created.title}" créé avec succès !`, 'Nouvelle Formation');
+    } catch (err: any) {
+      console.error('Error creating course:', err);
+      toast.error('Erreur lors de la création du cursus.', 'Erreur');
+    }
   };
 
   const handleSaveLesson = async (
     courseId: string,
     lessonData: { title: string; content: string; duration_minutes?: number; video_url?: string; audio_url?: string }
   ) => {
-    const newLesson = await trainingService.addLesson(courseId, lessonData, isDemoMode);
-    await loadCourses();
-    const updated = courses.find(c => c.id === courseId);
-    if (updated) {
-      setSelectedCourse(updated);
-      setSelectedLesson(newLesson);
+    try {
+      const newLesson = await trainingService.addLesson(courseId, lessonData, isDemoMode);
+      const updatedList = await loadCourses(courseId);
+      const updated = updatedList.find(c => c.id === courseId);
+      if (updated) {
+        setSelectedCourse(updated);
+        setSelectedLesson(newLesson);
+      }
+      toast.success(`Leçon "${newLesson.title}" ajoutée au cursus !`, 'Module Ajouté');
+    } catch (err: any) {
+      console.error('Error adding lesson:', err);
+      toast.error('Erreur lors de l\'ajout de la leçon.', 'Erreur');
     }
   };
 
@@ -91,6 +117,7 @@ export const TrainingPage: React.FC = () => {
     if (!confirm('Voulez-vous supprimer ce cursus de formation ?')) return;
     await trainingService.deleteCourse(courseId, isDemoMode);
     await loadCourses();
+    toast.info('Cursus de formation supprimé.', 'Suppression');
   };
 
   const allLessons: Lesson[] = selectedCourse?.modules?.flatMap(m => m.lessons || []) || [];
@@ -126,7 +153,7 @@ export const TrainingPage: React.FC = () => {
               className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-xl flex items-center justify-center gap-2 shadow transition shrink-0"
             >
               <PlusCircle className="w-4 h-4" />
-              Alimenter une Formation
+              Créer une Formation
             </button>
           </div>
         )}
@@ -145,7 +172,7 @@ export const TrainingPage: React.FC = () => {
           <div className="space-y-3">
             {courses.length === 0 ? (
               <div className="p-6 bg-slate-900 border border-slate-800 rounded-2xl text-center text-xs text-slate-500">
-                Aucun cursus de formation disponible. Cliquez sur <strong className="text-slate-300">"Alimenter une Formation"</strong> pour créer le premier cours.
+                Aucun cursus de formation disponible. Cliquez sur <strong className="text-slate-300">"Créer une Formation"</strong> pour créer le premier cours.
               </div>
             ) : (
               courses.map((c) => {
@@ -210,7 +237,7 @@ export const TrainingPage: React.FC = () => {
 
               {allLessons.length === 0 ? (
                 <div className="p-4 bg-slate-950/50 border border-slate-800 rounded-xl text-center text-xs text-slate-500">
-                  Aucune leçon dans ce cursus. Cliquez sur <strong className="text-emerald-400">"Alimenter une Formation"</strong> pour ajouter la 1ère leçon.
+                  Aucune leçon dans ce cursus. Cliquez sur <strong className="text-emerald-400">"Créer une Formation"</strong> pour ajouter la 1ère leçon.
                 </div>
               ) : (
                 <div className="space-y-1.5">
@@ -276,7 +303,7 @@ export const TrainingPage: React.FC = () => {
                 </div>
 
                 <button
-                  onClick={() => alert('Leçon validée avec succès dans le carnet spirituel !')}
+                  onClick={() => toast.success('Leçon validée avec succès dans le carnet spirituel !', 'Progrès Spirituel')}
                   className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition shadow"
                 >
                   <CheckCircle className="w-4 h-4" /> Marquer comme Assimilée

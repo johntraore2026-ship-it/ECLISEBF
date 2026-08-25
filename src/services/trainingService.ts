@@ -37,14 +37,20 @@ let localDemoEnrollments: CourseEnrollment[] = [
   }
 ];
 
+const isValidUuid = (str?: string) =>
+  Boolean(str && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str));
+
 export const trainingService = {
   async getCourses(churchId: string, isDemoMode = false): Promise<Course[]> {
+    const filterFn = (c: Course) =>
+      !churchId || c.church_id === churchId || c.church_id === 'ch-1' || !c.church_id;
+
     if (isDemoMode || !isSupabaseConfigured) {
-      return localDemoCourses.filter(c => c.church_id === churchId);
+      return localDemoCourses.filter(filterFn);
     }
 
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('courses')
         .select(`
           *,
@@ -55,20 +61,42 @@ export const trainingService = {
             lessons(id, title, content, video_url, audio_url, duration_minutes, order_index)
           )
         `)
-        .eq('church_id', churchId)
         .order('created_at', { ascending: false });
 
-      if (error) {
-        if (isTableMissingError(error)) {
-          console.warn('Supabase courses notice (using local fallback):', error.message || error);
-          return localDemoCourses.filter(c => c.church_id === churchId);
-        }
-        return localDemoCourses.filter(c => c.church_id === churchId);
+      if (churchId && isValidUuid(churchId)) {
+        query = query.eq('church_id', churchId);
       }
 
-      return (data || []) as Course[];
+      const { data, error } = await query;
+
+      if (error || !data || data.length === 0) {
+        return localDemoCourses.filter(filterFn);
+      }
+
+      const formattedData = data.map(d => ({
+        ...d,
+        modules: (d.modules && d.modules.length > 0)
+          ? d.modules.map((m: any) => ({
+              ...m,
+              lessons: m.lessons || []
+            }))
+          : [
+              {
+                id: `mod-fallback-${d.id}`,
+                course_id: d.id,
+                title: 'Module 1 : Généralités & Fondements',
+                order_index: 1,
+                lessons: []
+              }
+            ]
+      }));
+
+      // Merge local newly created courses that may not be in DB yet
+      const dbIds = new Set(formattedData.map(d => d.id));
+      const localOnly = localDemoCourses.filter(c => filterFn(c) && !dbIds.has(c.id));
+      return [...formattedData, ...localOnly] as Course[];
     } catch {
-      return localDemoCourses.filter(c => c.church_id === churchId);
+      return localDemoCourses.filter(filterFn);
     }
   },
 
@@ -76,57 +104,93 @@ export const trainingService = {
     courseData: Omit<Course, 'id' | 'created_at'>,
     isDemoMode = false
   ): Promise<Course> {
-    if (isDemoMode || !isSupabaseConfigured) {
-      const newCourse: Course = {
-        ...courseData,
-        id: `crs-demo-${Date.now()}`,
-        created_at: new Date().toISOString(),
-        modules: [
-          {
-            id: `mod-demo-${Date.now()}`,
-            course_id: `crs-demo-${Date.now()}`,
-            title: 'Module 1 : Généralités & Fondements',
-            order_index: 1,
-            lessons: []
-          }
-        ]
-      };
-      localDemoCourses = [newCourse, ...localDemoCourses];
-      return newCourse;
-    }
+    const targetChurchId = courseData.church_id || 'ch-1';
+    const courseId = `crs-demo-${Date.now()}`;
+    const defaultModule: CourseModule = {
+      id: `mod-demo-${Date.now()}`,
+      course_id: courseId,
+      title: 'Module 1 : Généralités & Fondements',
+      order_index: 1,
+      lessons: []
+    };
 
-    try {
-      const { data, error } = await supabase
-        .from('courses')
-        .insert([courseData])
-        .select()
-        .single();
+    const newCourse: Course = {
+      ...courseData,
+      church_id: targetChurchId,
+      id: courseId,
+      created_at: new Date().toISOString(),
+      modules: [defaultModule]
+    };
 
-      if (error) {
-        if (isTableMissingError(error)) {
-          const newCourse: Course = {
-            ...courseData,
-            id: `crs-demo-${Date.now()}`,
-            created_at: new Date().toISOString(),
-            modules: []
-          };
-          localDemoCourses = [newCourse, ...localDemoCourses];
-          return newCourse;
+    localDemoCourses = [newCourse, ...localDemoCourses];
+
+    if (!isDemoMode && isSupabaseConfigured) {
+      try {
+        const insertPayload: any = { ...courseData };
+        if (targetChurchId && isValidUuid(targetChurchId)) {
+          insertPayload.church_id = targetChurchId;
+        } else {
+          delete insertPayload.church_id;
         }
-        throw new Error(`Erreur création cours : ${error.message}`);
-      }
 
-      return data as Course;
-    } catch (err: any) {
-      const newCourse: Course = {
-        ...courseData,
-        id: `crs-demo-${Date.now()}`,
-        created_at: new Date().toISOString(),
-        modules: []
-      };
-      localDemoCourses = [newCourse, ...localDemoCourses];
-      return newCourse;
+        const { data, error } = await supabase
+          .from('courses')
+          .insert([insertPayload])
+          .select()
+          .single();
+
+        if (!error && data) {
+          let dbModules: CourseModule[] = [];
+
+          try {
+            const { data: modData } = await supabase
+              .from('course_modules')
+              .insert([{
+                course_id: data.id,
+                title: 'Module 1 : Généralités & Fondements',
+                order_index: 1
+              }])
+              .select()
+              .single();
+
+            if (modData) {
+              dbModules = [{
+                id: modData.id,
+                course_id: data.id,
+                title: modData.title,
+                order_index: modData.order_index,
+                lessons: []
+              }];
+            }
+          } catch (modErr) {
+            console.warn('Supabase course_modules insert notice:', modErr);
+          }
+
+          if (dbModules.length === 0) {
+            dbModules = [
+              {
+                id: `mod-demo-${Date.now()}`,
+                course_id: data.id,
+                title: 'Module 1 : Généralités & Fondements',
+                order_index: 1,
+                lessons: []
+              }
+            ];
+          }
+
+          const dbCourse: Course = {
+            ...data,
+            modules: dbModules
+          };
+          localDemoCourses = localDemoCourses.map(c => c.id === newCourse.id ? dbCourse : c);
+          return dbCourse;
+        }
+      } catch (err) {
+        console.warn('Supabase createCourse fallback to local memory:', err);
+      }
     }
+
+    return newCourse;
   },
 
   async addLesson(
@@ -153,7 +217,7 @@ export const trainingService = {
           {
             id: `mod-demo-${courseId}`,
             course_id: courseId,
-            title: 'Module Principal',
+            title: 'Module 1 : Généralités & Fondements',
             order_index: 1,
             lessons: []
           }
@@ -163,36 +227,59 @@ export const trainingService = {
       targetCourse.modules[0].lessons.push(newLesson);
     }
 
-    if (!isDemoMode && isSupabaseConfigured) {
+    if (!isDemoMode && isSupabaseConfigured && isValidUuid(courseId)) {
       try {
-        // Try DB insertion if tables exist
         const { data: moduleData } = await supabase
           .from('course_modules')
           .select('id')
           .eq('course_id', courseId)
-          .limit(1)
-          .single();
+          .order('order_index', { ascending: true })
+          .limit(1);
 
-        let moduleId = moduleData?.id;
+        let moduleId = moduleData && moduleData.length > 0 ? moduleData[0].id : null;
+
         if (!moduleId) {
           const { data: newMod } = await supabase
             .from('course_modules')
-            .insert([{ course_id: courseId, title: 'Module Principal', order_index: 1 }])
+            .insert([{ course_id: courseId, title: 'Module 1 : Généralités & Fondements', order_index: 1 }])
             .select()
             .single();
           moduleId = newMod?.id;
         }
 
         if (moduleId) {
-          await supabase.from('lessons').insert([{
-            module_id: moduleId,
-            title: lessonData.title,
-            content: lessonData.content,
-            duration_minutes: lessonData.duration_minutes,
-            video_url: lessonData.video_url,
-            audio_url: lessonData.audio_url,
-            order_index: 1
-          }]);
+          const { data: insertedLesson } = await supabase
+            .from('lessons')
+            .insert([{
+              module_id: moduleId,
+              title: lessonData.title,
+              content: lessonData.content,
+              duration_minutes: lessonData.duration_minutes || 25,
+              video_url: lessonData.video_url || null,
+              audio_url: lessonData.audio_url || null,
+              order_index: Date.now()
+            }])
+            .select()
+            .single();
+
+          if (insertedLesson) {
+            const realLesson: Lesson = {
+              id: insertedLesson.id,
+              module_id: moduleId,
+              title: insertedLesson.title,
+              content: insertedLesson.content,
+              duration_minutes: insertedLesson.duration_minutes,
+              video_url: insertedLesson.video_url,
+              audio_url: insertedLesson.audio_url,
+              order_index: insertedLesson.order_index
+            };
+            if (targetCourse && targetCourse.modules && targetCourse.modules[0]) {
+              targetCourse.modules[0].lessons = targetCourse.modules[0].lessons.map(l =>
+                l.id === newLesson.id ? realLesson : l
+              );
+            }
+            return realLesson;
+          }
         }
       } catch (err) {
         console.warn('Supabase lesson insertion fallback to local memory:', err);
