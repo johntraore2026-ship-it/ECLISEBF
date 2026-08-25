@@ -15,6 +15,7 @@ import { EventsPage } from './pages/EventsPage';
 import { AuditPage } from './pages/AuditPage';
 import { SupabaseConfigPage } from './pages/SupabaseConfigPage';
 import { AuthPage } from './pages/AuthPage';
+import { ShieldAlert, ArrowLeft } from 'lucide-react';
 
 // Modals
 import { RegisterChurchModal } from './components/modals/RegisterChurchModal';
@@ -27,7 +28,7 @@ import { QuickActionFloatingButton } from './components/layout/QuickActionFloati
 import { Member } from './types';
 
 const MainAppContent: React.FC = () => {
-  const { user, isDemoMode, churchId } = useAuth();
+  const { user, isDemoMode, churchId, canAccessTab, roles, demoRole } = useAuth();
 
   const [activeTab, setActiveTab] = useState<string>('dashboard');
 
@@ -73,6 +74,9 @@ const MainAppContent: React.FC = () => {
     setShowPastoralModal(true);
   };
 
+  const activeRoleName = roles[0]?.name || demoRole || 'Utilisateur';
+  const isTabAllowed = canAccessTab(activeTab);
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-emerald-500 selection:text-white">
       
@@ -94,59 +98,82 @@ const MainAppContent: React.FC = () => {
 
         {/* Dynamic Content View */}
         <main className="flex-1 p-4 sm:p-6 lg:p-8 min-w-0 overflow-y-auto">
-          {activeTab === 'dashboard' && (
-            <DashboardPage
-              key={refreshKey}
-              setActiveTab={setActiveTab}
-              onOpenAddMember={handleOpenAddMember}
-              onOpenAddFinance={() => setShowFinanceModal(true)}
-              onOpenAddAttendance={() => setShowAttendanceModal(true)}
-              onOpenAddPastoral={() => setShowPastoralModal(true)}
-            />
-          )}
+          {!isTabAllowed ? (
+            <div className="bg-slate-900 border border-red-900/60 rounded-2xl p-8 text-center max-w-xl mx-auto my-12 shadow-2xl space-y-4">
+              <div className="w-16 h-16 rounded-full bg-red-950/80 border border-red-800 text-red-400 flex items-center justify-center mx-auto">
+                <ShieldAlert className="w-8 h-8" />
+              </div>
+              <h2 className="text-xl font-bold text-white">Accès Restreint</h2>
+              <p className="text-sm text-slate-300">
+                Votre profil actuel (<strong className="text-emerald-300">{activeRoleName}</strong>) ne dispose pas des privilèges nécessaires pour accéder au module <code className="text-red-300 uppercase">{activeTab}</code>.
+              </p>
+              <div className="pt-2">
+                <button
+                  onClick={() => setActiveTab('dashboard')}
+                  className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-xl inline-flex items-center gap-2 shadow transition"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  Retour au Tableau de bord
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              {activeTab === 'dashboard' && (
+                <DashboardPage
+                  key={refreshKey}
+                  setActiveTab={setActiveTab}
+                  onOpenAddMember={handleOpenAddMember}
+                  onOpenAddFinance={() => setShowFinanceModal(true)}
+                  onOpenAddAttendance={() => setShowAttendanceModal(true)}
+                  onOpenAddPastoral={() => setShowPastoralModal(true)}
+                />
+              )}
 
-          {activeTab === 'members' && (
-            <MembersPage
-              key={refreshKey}
-              onOpenAddMember={handleOpenAddMember}
-              onEditMember={handleEditMember}
-              onOpenPastoralForMember={handleOpenPastoralForMember}
-            />
-          )}
+              {activeTab === 'members' && (
+                <MembersPage
+                  key={refreshKey}
+                  onOpenAddMember={handleOpenAddMember}
+                  onEditMember={handleEditMember}
+                  onOpenPastoralForMember={handleOpenPastoralForMember}
+                />
+              )}
 
-          {activeTab === 'departments' && <DepartmentsPage key={refreshKey} />}
+              {activeTab === 'departments' && <DepartmentsPage key={refreshKey} />}
 
-          {activeTab === 'attendance' && (
-            <AttendancePage
-              key={refreshKey}
-              onOpenAddAttendance={() => setShowAttendanceModal(true)}
-            />
-          )}
+              {activeTab === 'attendance' && (
+                <AttendancePage
+                  key={refreshKey}
+                  onOpenAddAttendance={() => setShowAttendanceModal(true)}
+                />
+              )}
 
-          {activeTab === 'finance' && (
-            <FinancePage
-              key={refreshKey}
-              onOpenAddFinance={() => setShowFinanceModal(true)}
-            />
-          )}
+              {activeTab === 'finance' && (
+                <FinancePage
+                  key={refreshKey}
+                  onOpenAddFinance={() => setShowFinanceModal(true)}
+                />
+              )}
 
-          {activeTab === 'pastoral' && (
-            <PastoralPage
-              key={refreshKey}
-              onOpenAddPastoral={() => setShowPastoralModal(true)}
-            />
-          )}
+              {activeTab === 'pastoral' && (
+                <PastoralPage
+                  key={refreshKey}
+                  onOpenAddPastoral={() => setShowPastoralModal(true)}
+                />
+              )}
 
-          {activeTab === 'training' && <TrainingPage key={refreshKey} />}
+              {activeTab === 'training' && <TrainingPage key={refreshKey} />}
 
-          {activeTab === 'media' && <MediaPage key={refreshKey} />}
+              {activeTab === 'media' && <MediaPage key={refreshKey} />}
 
-          {activeTab === 'events' && <EventsPage key={refreshKey} />}
+              {activeTab === 'events' && <EventsPage key={refreshKey} />}
 
-          {activeTab === 'audit' && <AuditPage key={refreshKey} />}
+              {activeTab === 'audit' && <AuditPage key={refreshKey} />}
 
-          {activeTab === 'config' && (
-            <SupabaseConfigPage onOpenSqlModal={() => setShowSqlModal(true)} />
+              {activeTab === 'config' && (
+                <SupabaseConfigPage onOpenSqlModal={() => setShowSqlModal(true)} />
+              )}
+            </>
           )}
         </main>
       </div>

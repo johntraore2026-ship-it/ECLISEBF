@@ -15,6 +15,7 @@ import {
   ArrowRight
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { RolePermissionsManager } from '../components/config/RolePermissionsManager';
 
 interface SupabaseConfigPageProps {
   onOpenSqlModal: () => void;
@@ -132,6 +133,9 @@ VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...`;
         </div>
 
       </div>
+
+      {/* Dynamic Role & Permissions Management Section */}
+      <RolePermissionsManager />
 
       {/* Guide de Déploiement en 3 Étapes */}
       <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 space-y-4">

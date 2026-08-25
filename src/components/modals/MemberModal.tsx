@@ -3,6 +3,7 @@ import { X, UserPlus, Save, AlertCircle, User, Phone, Mail, MapPin, Award } from
 import { Member, Gender, MaritalStatus, SpiritualStatus } from '../../types';
 import { memberService } from '../../services/memberService';
 import { useAuth } from '../../contexts/AuthContext';
+import { useToast } from '../../contexts/ToastContext';
 
 interface MemberModalProps {
   isOpen: boolean;
@@ -17,7 +18,8 @@ export const MemberModal: React.FC<MemberModalProps> = ({
   memberToEdit,
   onMemberSaved
 }) => {
-  const { churchId, isDemoMode } = useAuth();
+  const { churchId, isDemoMode, profile } = useAuth();
+  const { toast } = useToast();
 
   const [formData, setFormData] = useState<Partial<Member>>({
     first_name: '',
@@ -83,6 +85,10 @@ export const MemberModal: React.FC<MemberModalProps> = ({
     try {
       if (memberToEdit) {
         await memberService.updateMember(memberToEdit.id, formData, churchId, isDemoMode);
+        toast.success(
+          `${profile?.first_name || 'Responsable'}, la fiche de ${formData.first_name} ${formData.last_name} a été mise à jour !`,
+          'Fiche Membre Actualisée'
+        );
       } else {
         await memberService.createMember({
           church_id: churchId,
@@ -104,6 +110,10 @@ export const MemberModal: React.FC<MemberModalProps> = ({
           is_active: formData.is_active ?? true,
           notes: formData.notes,
         }, isDemoMode);
+        toast.success(
+          `${profile?.first_name || 'Responsable'}, le membre ${formData.first_name} ${formData.last_name} a été enregistré avec succès !`,
+          'Nouveau Membre Enregistré'
+        );
       }
 
       onMemberSaved();

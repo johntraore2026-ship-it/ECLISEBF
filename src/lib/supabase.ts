@@ -37,6 +37,24 @@ export const supabase: SupabaseClient = isSupabaseConfigured
 export const SUPABASE_CONFIG_MESSAGE = "Configuration Supabase requise. Veuillez renseigner VITE_SUPABASE_URL et VITE_SUPABASE_ANON_KEY dans vos variables d'environnement.";
 
 /**
+ * Helper to check if a Supabase error is caused by a missing table, relation, or schema cache issue
+ */
+export function isTableMissingError(error: any): boolean {
+  if (!error) return false;
+  const msg = String(error.message || error.details || error || '').toLowerCase();
+  const code = String(error.code || '').toLowerCase();
+  return (
+    code === '42p01' ||
+    code.startsWith('pgrst') ||
+    msg.includes('schema cache') ||
+    msg.includes('could not find the table') ||
+    msg.includes('does not exist') ||
+    msg.includes('not found') ||
+    msg.includes('404')
+  );
+}
+
+/**
  * Validates that Supabase is ready for live requests.
  * Throws a formatted error if configuration is missing.
  */

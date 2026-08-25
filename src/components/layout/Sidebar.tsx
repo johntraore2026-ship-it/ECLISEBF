@@ -12,7 +12,8 @@ import {
   ShieldCheck,
   Database,
   Lock,
-  ChevronRight
+  ChevronRight,
+  ShieldAlert
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -22,101 +23,120 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
-  const { hasRole, hasPermission } = useAuth();
+  const { canAccessTab, roles, demoRole } = useAuth();
 
-  const navigationItems = [
+  const activeRoleName = roles[0]?.name || demoRole || 'Utilisateur';
+
+  const rawNavigationItems = [
     {
       id: 'dashboard',
       label: 'Tableau de bord',
       icon: LayoutDashboard,
       badge: null,
-      allowed: true,
     },
     {
       id: 'members',
       label: 'Membres & Familles',
       icon: Users,
       badge: null,
-      allowed: true,
     },
     {
       id: 'departments',
       label: 'Départements & Cellules',
       icon: Network,
       badge: null,
-      allowed: true,
     },
     {
       id: 'attendance',
       label: 'Cultes & Présences',
       icon: CalendarCheck,
       badge: null,
-      allowed: true,
     },
     {
       id: 'finance',
       label: 'Finances & Dîmes',
       icon: Wallet,
       badge: 'Circuit Valid.',
-      allowed: true,
     },
     {
       id: 'pastoral',
       label: 'Suivi Pastoral & Prières',
       icon: HeartHandshake,
       badge: 'Confidentiel',
-      allowed: true,
     },
     {
       id: 'training',
       label: 'Formations & Discipulat',
       icon: GraduationCap,
       badge: null,
-      allowed: true,
     },
     {
       id: 'media',
       label: 'Médiathèque & Sermons',
       icon: Music,
       badge: null,
-      allowed: true,
     },
     {
       id: 'events',
       label: 'Événements & Annonces',
       icon: Calendar,
       badge: null,
-      allowed: true,
     },
     {
       id: 'audit',
       label: 'Audit & Sécurité RLS',
       icon: ShieldCheck,
       badge: 'Admin',
-      allowed: true,
     },
     {
       id: 'config',
       label: 'Configuration Supabase',
       icon: Database,
       badge: 'SQL',
-      allowed: true,
     },
   ];
+
+  const navigationItems = rawNavigationItems.map(item => ({
+    ...item,
+    allowed: canAccessTab(item.id)
+  }));
 
   return (
     <aside id="main-navigation-sidebar" className="w-64 bg-slate-900 border-r border-slate-800 flex flex-col shrink-0 min-h-[calc(100vh-4rem)]">
       
-      {/* Category header */}
-      <div className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500">
-        Gestion Église Locale
+      {/* Category header & active profile badge */}
+      <div className="px-4 py-3 border-b border-slate-800/80 bg-slate-950/40">
+        <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+          Gestion Église Locale
+        </div>
+        <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-slate-800/80 border border-slate-700/80 text-[11px] text-emerald-300 font-medium truncate">
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shrink-0"></span>
+          <span className="truncate">Profil : <strong>{activeRoleName}</strong></span>
+        </div>
       </div>
 
       {/* Menu items */}
-      <nav className="flex-1 px-3 space-y-1 overflow-y-auto pb-6">
+      <nav className="flex-1 px-3 py-3 space-y-1 overflow-y-auto">
         {navigationItems.map((item) => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;
+          const isAllowed = item.allowed;
+
+          if (!isAllowed) {
+            return (
+              <div
+                key={item.id}
+                title={`Accès restreint au rôle ${activeRoleName}`}
+                className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-medium text-slate-600 bg-slate-950/40 opacity-60 cursor-not-allowed select-none"
+              >
+                <div className="flex items-center gap-2.5 truncate">
+                  <Icon className="w-4 h-4 shrink-0 text-slate-600" />
+                  <span className="truncate line-through text-slate-500">{item.label}</span>
+                </div>
+                <ShieldAlert className="w-3.5 h-3.5 text-slate-600 shrink-0" />
+              </div>
+            );
+          }
 
           return (
             <button
@@ -164,7 +184,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
           <span>Isolation PostgreSQL RLS</span>
         </div>
         <p className="text-[10px] text-slate-400 leading-relaxed">
-          Toutes les requêtes sont filtrées au niveau base de données par <code className="text-emerald-300">church_id</code>.
+          Toutes les requêtes sont filtrées par <code className="text-emerald-300">church_id</code> et adaptées au rôle.
         </p>
       </div>
 

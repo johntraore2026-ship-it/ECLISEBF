@@ -23,6 +23,7 @@ import { FinanceTransaction, FinanceCategory, TransactionType } from '../types';
 import { financeService, FinanceSummary } from '../services/financeService';
 import { useAuth } from '../contexts/AuthContext';
 import { exportFinanceReportToCSV } from '../utils/csvExport';
+import { FinanceChartsSection } from '../components/finance/FinanceChartsSection';
 
 interface FinancePageProps {
   onOpenAddFinance: () => void;
@@ -210,6 +211,9 @@ export const FinancePage: React.FC<FinancePageProps> = ({ onOpenAddFinance }) =>
         </div>
 
       </div>
+
+      {/* Visual Recharts Analytics Section */}
+      <FinanceChartsSection transactions={transactions} />
 
       {/* Tabs & Filters */}
       <div className="bg-slate-900/90 border border-slate-800 p-4 rounded-2xl flex flex-wrap items-center justify-between gap-3">

@@ -1,4 +1,4 @@
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { supabase, isSupabaseConfigured, isTableMissingError } from '../lib/supabase';
 import { AuditLog } from '../types';
 import { DEMO_AUDIT_LOGS } from '../data/demoData';
 
@@ -18,6 +18,10 @@ export const auditService = {
       .limit(100);
 
     if (error) {
+      if (isTableMissingError(error)) {
+        console.warn('Supabase audit_logs notice (using local fallback):', error.message || error);
+        return localDemoLogs.filter(l => l.church_id === churchId);
+      }
       throw new Error(`Erreur journal d'audit : ${error.message}`);
     }
 

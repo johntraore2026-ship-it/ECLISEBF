@@ -1,4 +1,4 @@
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { supabase, isSupabaseConfigured, isTableMissingError } from '../lib/supabase';
 import { AttendanceSession, AttendanceRecord } from '../types';
 import { DEMO_ATTENDANCE } from '../data/demoData';
 
@@ -19,7 +19,7 @@ export const attendanceService = {
       .order('session_date', { ascending: false });
 
     if (error) {
-      if (error.code === '42P01' || error.message.includes('does not exist') || error.message.includes('404')) {
+      if (isTableMissingError(error)) {
         return localDemoAttendance
           .filter(s => s.church_id === churchId)
           .sort((a, b) => new Date(b.session_date).getTime() - new Date(a.session_date).getTime());

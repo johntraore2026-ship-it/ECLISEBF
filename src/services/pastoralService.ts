@@ -1,4 +1,4 @@
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { supabase, isSupabaseConfigured, isTableMissingError } from '../lib/supabase';
 import { PastoralRecord, PastoralVisit, PrayerRequest } from '../types';
 import { DEMO_PASTORAL_RECORDS, DEMO_PASTORAL_VISITS, DEMO_PRAYER_REQUESTS } from '../data/demoData';
 
@@ -12,27 +12,44 @@ export const pastoralService = {
       return localDemoRecords.filter(r => r.church_id === churchId);
     }
 
-    const { data, error } = await supabase
-      .from('pastoral_records')
-      .select(`
-        *,
-        member:members(first_name, last_name),
-        pastor:profiles!pastoral_records_pastor_id_fkey(first_name, last_name)
-      `)
-      .eq('church_id', churchId)
-      .order('created_at', { ascending: false });
+    let data: any = null;
+    let error: any = null;
 
-    if (error) {
-      if (error.code === '42P01' || error.message.includes('does not exist') || error.message.includes('404')) {
-        return localDemoRecords.filter(r => r.church_id === churchId);
+    try {
+      const res = await supabase
+        .from('pastoral_records')
+        .select(`
+          *,
+          member:members(first_name, last_name)
+        `)
+        .eq('church_id', churchId)
+        .order('created_at', { ascending: false });
+
+      if (res.error) {
+        const simpleRes = await supabase
+          .from('pastoral_records')
+          .select('*')
+          .eq('church_id', churchId)
+          .order('created_at', { ascending: false });
+        data = simpleRes.data;
+        error = simpleRes.error;
+      } else {
+        data = res.data;
+        error = res.error;
       }
-      throw new Error(`Accès restreint ou erreur pastoral : ${error.message}`);
+    } catch (e: any) {
+      error = e;
     }
 
-    return (data || []).map(item => ({
+    if (error) {
+      console.warn('Supabase pastoral_records notice (using local fallback):', error.message || error);
+      return localDemoRecords.filter(r => r.church_id === churchId);
+    }
+
+    return (data || []).map((item: any) => ({
       ...item,
       member_name: item.member ? `${item.member.first_name} ${item.member.last_name}` : item.member_name,
-      pastor_name: item.pastor ? `${item.pastor.first_name} ${item.pastor.last_name}` : item.pastor_name,
+      pastor_name: item.pastor_name || undefined,
     })) as PastoralRecord[];
   },
 
@@ -79,6 +96,10 @@ export const pastoralService = {
       .order('visit_date', { ascending: false });
 
     if (error) {
+      if (isTableMissingError(error)) {
+        console.warn('Supabase pastoral_visits notice (using local fallback):', error.message || error);
+        return localDemoVisits.filter(v => v.church_id === churchId);
+      }
       throw new Error(`Erreur lors du chargement des visites : ${error.message}`);
     }
 
@@ -127,6 +148,10 @@ export const pastoralService = {
       .order('created_at', { ascending: false });
 
     if (error) {
+      if (isTableMissingError(error)) {
+        console.warn('Supabase prayer_requests notice (using local fallback):', error.message || error);
+        return localDemoRequests.filter(r => r.church_id === churchId);
+      }
       throw new Error(`Erreur requêtes de prière : ${error.message}`);
     }
 

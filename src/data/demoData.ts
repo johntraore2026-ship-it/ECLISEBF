@@ -77,10 +77,12 @@ export const DEMO_CHURCHES_LIST: Church[] = [
 export const DEMO_ROLES: Role[] = [
   { id: 'r1', code: 'SUPER_ADMIN', name: 'Super Administrateur', level: 1, is_system: true },
   { id: 'r2', code: 'CHURCH_ADMIN', name: "Administrateur d'Église", level: 5, is_system: true },
-  { id: 'r3', code: 'PASTOR', name: 'Pasteur Principal / Associé', level: 6, is_system: true },
-  { id: 'r4', code: 'TREASURER', name: 'Trésorier Général', level: 7, is_system: true },
-  { id: 'r5', code: 'LEADER', name: 'Responsable Cellule / Département', level: 8, is_system: true },
-  { id: 'r6', code: 'MEMBER', name: 'Membre', level: 9, is_system: true },
+  { id: 'r3', code: 'PASTOR', name: 'Pasteur / Responsable Spirituel', level: 6, is_system: true },
+  { id: 'r4', code: 'TREASURER', name: 'Trésorier / Comptable', level: 7, is_system: true },
+  { id: 'r5', code: 'SECRETARY', name: 'Secrétaire Paroissial', level: 8, is_system: true },
+  { id: 'r6', code: 'LEADER', name: 'Responsable Cellule / Département', level: 9, is_system: true },
+  { id: 'r7', code: 'DEPARTMENT_LEADER', name: 'Responsable de Département', level: 9, is_system: true },
+  { id: 'r8', code: 'MEMBER', name: 'Membre de la Communauté', level: 10, is_system: true },
 ];
 
 export const DEMO_PERMISSIONS: Permission[] = [

@@ -74,13 +74,13 @@ export const MemberFilterToolbar: React.FC<MemberFilterToolbarProps> = ({
       {/* Top Row: Search Input + Toggle Advanced + Reset */}
       <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
         
-        {/* Main Search Bar */}
+        {/* Main Search Bar with Real-Time Indicator */}
         <div className="relative flex-1">
           <Search className="w-4 h-4 text-emerald-400 absolute left-3.5 top-3" />
           <input
             type="text"
             id="members-search-input"
-            placeholder="Rechercher par nom, prénom, tél, email, quartier, profession..."
+            placeholder="Rechercher en temps réel (nom, prénom, téléphone, quartier, département)..."
             value={filters.searchQuery}
             onChange={handleTextChange}
             className="w-full bg-slate-950/80 border border-slate-700/80 rounded-xl pl-10 pr-9 py-2.5 text-xs text-white placeholder-slate-500 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition"
@@ -98,9 +98,11 @@ export const MemberFilterToolbar: React.FC<MemberFilterToolbarProps> = ({
 
         {/* Results Counter & Controls */}
         <div className="flex items-center justify-between md:justify-end gap-2.5">
-          <div className="text-xs text-slate-400 font-medium px-3 py-2 bg-slate-950/60 border border-slate-800 rounded-xl">
-            <span className="text-emerald-400 font-bold">{filteredCount}</span> sur{' '}
-            <span className="text-slate-300 font-semibold">{totalCount}</span> membres
+          <div className="text-xs text-slate-400 font-medium px-3 py-2 bg-slate-950/60 border border-slate-800 rounded-xl flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0"></span>
+            <span>
+              <strong className="text-emerald-400">{filteredCount}</strong> / <strong className="text-slate-300">{totalCount}</strong>
+            </span>
           </div>
 
           <button
@@ -112,7 +114,7 @@ export const MemberFilterToolbar: React.FC<MemberFilterToolbarProps> = ({
             }`}
           >
             <SlidersHorizontal className="w-3.5 h-3.5" />
-            <span>Filtres</span>
+            <span>Filtres Avancés</span>
             {activeFilterCount > 0 && (
               <span className="w-4 h-4 rounded-full bg-emerald-500 text-slate-950 font-black text-[10px] flex items-center justify-center">
                 {activeFilterCount}
@@ -131,6 +133,85 @@ export const MemberFilterToolbar: React.FC<MemberFilterToolbarProps> = ({
             </button>
           )}
         </div>
+      </div>
+
+      {/* Quick Filter Pills Bar (Instant Filtering by Status & Key Departments) */}
+      <div className="flex flex-wrap items-center gap-1.5 pt-1 text-xs">
+        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mr-1">Raccourcis :</span>
+        
+        {/* Status Quick Pills */}
+        <button
+          onClick={() => handleSelectChange('activityStatus', 'ALL')}
+          className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition border ${
+            filters.activityStatus === 'ALL' && filters.spiritualStatus === 'ALL' && filters.departmentId === 'ALL'
+              ? 'bg-emerald-600 text-white border-emerald-500'
+              : 'bg-slate-800/70 text-slate-400 hover:text-white border-slate-700'
+          }`}
+        >
+          Tous ({totalCount})
+        </button>
+
+        <button
+          onClick={() => handleSelectChange('activityStatus', filters.activityStatus === 'ACTIVE' ? 'ALL' : 'ACTIVE')}
+          className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition border ${
+            filters.activityStatus === 'ACTIVE'
+              ? 'bg-emerald-600 text-white border-emerald-500'
+              : 'bg-slate-800/70 text-slate-400 hover:text-white border-slate-700'
+          }`}
+        >
+          🟢 Actifs
+        </button>
+
+        <button
+          onClick={() => handleSelectChange('activityStatus', filters.activityStatus === 'INACTIVE' ? 'ALL' : 'INACTIVE')}
+          className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition border ${
+            filters.activityStatus === 'INACTIVE'
+              ? 'bg-rose-600 text-white border-rose-500'
+              : 'bg-slate-800/70 text-slate-400 hover:text-white border-slate-700'
+          }`}
+        >
+          🔴 Inactifs
+        </button>
+
+        <button
+          onClick={() => handleSelectChange('baptismStatus', filters.baptismStatus === 'WATER_BAPTIZED' ? 'ALL' : 'WATER_BAPTIZED')}
+          className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition border ${
+            filters.baptismStatus === 'WATER_BAPTIZED'
+              ? 'bg-cyan-600 text-white border-cyan-500'
+              : 'bg-slate-800/70 text-slate-400 hover:text-white border-slate-700'
+          }`}
+        >
+          💧 Baptisés d'Eau
+        </button>
+
+        <button
+          onClick={() => handleSelectChange('spiritualStatus', filters.spiritualStatus === 'NEW_CONVERT' ? 'ALL' : 'NEW_CONVERT')}
+          className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition border ${
+            filters.spiritualStatus === 'NEW_CONVERT'
+              ? 'bg-purple-600 text-white border-purple-500'
+              : 'bg-slate-800/70 text-slate-400 hover:text-white border-slate-700'
+          }`}
+        >
+          🌱 Nouveaux Convertis
+        </button>
+
+        {/* Top 3 Department Quick Pills */}
+        {departments.slice(0, 3).map((dept) => {
+          const isSelected = filters.departmentId === dept.id;
+          return (
+            <button
+              key={dept.id}
+              onClick={() => handleSelectChange('departmentId', isSelected ? 'ALL' : dept.id)}
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition border ${
+                isSelected
+                  ? 'bg-blue-600 text-white border-blue-500'
+                  : 'bg-slate-800/70 text-slate-400 hover:text-white border-slate-700'
+              }`}
+            >
+              🏢 {dept.name}
+            </button>
+          );
+        })}
       </div>
 
       {/* Advanced Filter Dropdowns Grid */}

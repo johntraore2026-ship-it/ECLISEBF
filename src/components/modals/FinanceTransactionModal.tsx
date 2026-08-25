@@ -4,6 +4,7 @@ import { FinanceCategory, Member, TransactionType } from '../../types';
 import { financeService } from '../../services/financeService';
 import { memberService } from '../../services/memberService';
 import { useAuth } from '../../contexts/AuthContext';
+import { useToast } from '../../contexts/ToastContext';
 
 interface FinanceTransactionModalProps {
   isOpen: boolean;
@@ -17,6 +18,7 @@ export const FinanceTransactionModal: React.FC<FinanceTransactionModalProps> = (
   onTransactionSaved,
 }) => {
   const { churchId, profile, user, isDemoMode, hasRole } = useAuth();
+  const { toast } = useToast();
 
   const [type, setType] = useState<TransactionType>('INCOME');
   const [categories, setCategories] = useState<FinanceCategory[]>([]);
@@ -87,6 +89,11 @@ export const FinanceTransactionModal: React.FC<FinanceTransactionModalProps> = (
         status: autoApprove ? 'APPROVED' : 'PENDING_APPROVAL',
         created_by: creatorId,
       }, isDemoMode);
+
+      toast.success(
+        `${profile?.first_name || 'Comptable'}, l'écriture de ${Number(amount).toLocaleString('fr-FR')} FCFA (${type === 'INCOME' ? 'Recette' : 'Dépense'}) a été enregistrée avec succès !`,
+        'Transaction Comptable Enregistrée'
+      );
 
       onTransactionSaved();
       onClose();

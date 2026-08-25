@@ -5,6 +5,52 @@ import { Profile, Role, Permission, Church } from '../types';
 import { DEMO_CHURCH, DEMO_PROFILES, DEMO_ROLES, DEMO_PERMISSIONS, DEMO_CHURCHES_LIST } from '../data/demoData';
 import { churchService, RegisterChurchParams } from '../services/churchService';
 
+export const ROLE_PERMISSIONS_MAP: Record<string, string[]> = {
+  SUPER_ADMIN: [
+    'members.read', 'members.create', 'members.edit', 'members.delete',
+    'finance.read', 'finance.create', 'finance.approve',
+    'pastoral.read', 'pastoral.create', 'pastoral.confidential',
+    'attendance.read', 'attendance.create',
+    'departments.manage', 'config.manage', 'audit.read'
+  ],
+  CHURCH_ADMIN: [
+    'members.read', 'members.create', 'members.edit', 'members.delete',
+    'finance.read', 'finance.create', 'finance.approve',
+    'pastoral.read', 'pastoral.create', 'pastoral.confidential',
+    'attendance.read', 'attendance.create',
+    'departments.manage', 'config.manage', 'audit.read'
+  ],
+  PASTOR: [
+    'members.read', 'members.create', 'members.edit',
+    'pastoral.read', 'pastoral.create', 'pastoral.confidential',
+    'attendance.read', 'attendance.create',
+    'departments.manage'
+  ],
+  TREASURER: [
+    'members.read',
+    'finance.read', 'finance.create', 'finance.approve',
+    'attendance.read'
+  ],
+  SECRETARY: [
+    'members.read', 'members.create', 'members.edit',
+    'attendance.read', 'attendance.create',
+    'departments.manage'
+  ],
+  LEADER: [
+    'members.read',
+    'attendance.read', 'attendance.create',
+    'departments.manage'
+  ],
+  DEPARTMENT_LEADER: [
+    'members.read',
+    'attendance.read', 'attendance.create',
+    'departments.manage'
+  ],
+  MEMBER: [
+    'attendance.read'
+  ]
+};
+
 interface AuthContextType {
   user: User | null;
   session: Session | null;
@@ -29,6 +75,7 @@ interface AuthContextType {
   registerNewChurch: (params: RegisterChurchParams) => Promise<{ success: boolean; church_id: string }>;
   hasRole: (roleCode: string) => boolean;
   hasPermission: (permCode: string) => boolean;
+  canAccessTab: (tabId: string) => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -131,7 +178,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               is_system: item.role.is_system,
             });
 
-            if (item.role.role_permissions) {
+            if (item.role.role_permissions && item.role.role_permissions.length > 0) {
               item.role.role_permissions.forEach((rp: any) => {
                 if (rp.permission) {
                   parsedPermissions.push(rp.permission);
@@ -141,13 +188,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
         });
 
+        if (parsedPermissions.length === 0 && parsedRoles.length > 0) {
+          const mainCode = parsedRoles[0].code;
+          const rolePermCodes = ROLE_PERMISSIONS_MAP[mainCode] || ROLE_PERMISSIONS_MAP['MEMBER'];
+          rolePermCodes.forEach((code, idx) => {
+            parsedPermissions.push({ id: `p_${idx}`, code, name: code, module: code.split('.')[0] });
+          });
+        }
+
         setRoles(parsedRoles);
         setPermissions(parsedPermissions);
       } else {
         // Default role when no explicit user_roles exist in Supabase
-        const defaultRole = DEMO_ROLES.find(r => r.code === 'CHURCH_ADMIN') || DEMO_ROLES[1];
+        const metaRoleCode = (activeUser.user_metadata?.role_code as string) || 'CHURCH_ADMIN';
+        const defaultRole = DEMO_ROLES.find(r => r.code === metaRoleCode) || DEMO_ROLES.find(r => r.code === 'CHURCH_ADMIN') || DEMO_ROLES[1];
         setRoles([defaultRole]);
-        setPermissions(DEMO_PERMISSIONS);
+
+        const rolePermCodes = ROLE_PERMISSIONS_MAP[metaRoleCode] || ROLE_PERMISSIONS_MAP['CHURCH_ADMIN'];
+        const activePerms: Permission[] = rolePermCodes.map((code, idx) => ({
+          id: `p_meta_${idx}`,
+          code,
+          name: code,
+          module: code.split('.')[0]
+        }));
+        setPermissions(activePerms);
       }
     } catch (err) {
       console.error('Initialization error in loadSupabaseUserData:', err);
@@ -169,9 +233,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setChurchId(DEMO_CHURCH.id);
     setCurrentChurch(DEMO_CHURCH);
 
-    const activeRole = DEMO_ROLES.find(r => r.code === roleCode) || DEMO_ROLES[1];
+    const activeRole = DEMO_ROLES.find(r => r.code === roleCode || (roleCode === 'DEPARTMENT_LEADER' && r.code === 'LEADER')) || DEMO_ROLES[1];
     setRoles([activeRole]);
-    setPermissions(DEMO_PERMISSIONS);
+
+    const rolePermCodes = ROLE_PERMISSIONS_MAP[roleCode] || ROLE_PERMISSIONS_MAP['CHURCH_ADMIN'];
+    const activePerms: Permission[] = rolePermCodes.map((code, idx) => ({
+      id: `p_demo_${idx}`,
+      code,
+      name: code,
+      module: code.split('.')[0]
+    }));
+    setPermissions(activePerms);
     setLoading(false);
   };
 
@@ -258,6 +330,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const firstName = (userMetadata.first_name as string) || email.split('@')[0] || 'Responsable';
           const lastName = (userMetadata.last_name as string) || '';
           const phone = (userMetadata.phone as string) || null;
+          const roleCode = (userMetadata.role_code as string) || 'CHURCH_ADMIN';
 
           // Check if there is an existing church to link by default
           const { data: defaultChurch } = await supabase
@@ -275,6 +348,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             church_id: defaultChurch?.id || null,
             status: 'ACTIVE'
           }, { onConflict: 'id' });
+
+          // Also attempt to assign user_roles in Supabase DB if roles table exists
+          try {
+            const { data: roleRecord } = await supabase
+              .from('roles')
+              .select('id')
+              .eq('code', roleCode)
+              .maybeSingle();
+
+            if (roleRecord?.id) {
+              await supabase.from('user_roles').upsert({
+                user_id: data.user.id,
+                role_id: roleRecord.id,
+                church_id: defaultChurch?.id || null
+              }, { onConflict: 'user_id,role_id,church_id' });
+            }
+          } catch (rErr) {
+            console.warn('Auto user_roles record notice:', rErr);
+          }
         } catch (profileErr) {
           console.warn('Auto profile initialization notice:', profileErr);
         }
@@ -327,6 +419,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const setDemoRole = (roleCode: string) => {
     setDemoRoleState(roleCode);
+    const activeRole = DEMO_ROLES.find(r => r.code === roleCode || (roleCode === 'DEPARTMENT_LEADER' && r.code === 'LEADER')) || DEMO_ROLES[1];
+    setRoles([activeRole]);
     if (isDemoMode) {
       initDemoData(roleCode);
     }
@@ -346,8 +440,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const hasPermission = (permCode: string): boolean => {
-    if (hasRole('SUPER_ADMIN') || hasRole('CHURCH_ADMIN')) return true;
+    if (roles.some(r => r.code === 'SUPER_ADMIN' || r.code === 'CHURCH_ADMIN')) return true;
     return permissions.some(p => p.code === permCode);
+  };
+
+  const canAccessTab = (tabId: string): boolean => {
+    if (roles.some(r => r.code === 'SUPER_ADMIN' || r.code === 'CHURCH_ADMIN')) return true;
+    const currentCode = roles[0]?.code || demoRole || 'MEMBER';
+
+    switch (tabId) {
+      case 'dashboard':
+        return true;
+      case 'members':
+        return hasPermission('members.read') || ['PASTOR', 'TREASURER', 'SECRETARY', 'LEADER', 'DEPARTMENT_LEADER'].includes(currentCode);
+      case 'departments':
+      case 'attendance':
+      case 'events':
+      case 'media':
+      case 'training':
+        return true;
+      case 'finance':
+        return hasPermission('finance.read') || currentCode === 'TREASURER';
+      case 'pastoral':
+        return hasPermission('pastoral.read') || currentCode === 'PASTOR';
+      case 'audit':
+        return hasPermission('audit.read') || ['SUPER_ADMIN', 'CHURCH_ADMIN'].includes(currentCode);
+      case 'config':
+        return hasPermission('config.manage') || ['SUPER_ADMIN', 'CHURCH_ADMIN'].includes(currentCode);
+      default:
+        return true;
+    }
   };
 
   return (
@@ -375,7 +497,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setDemoRole,
         registerNewChurch,
         hasRole,
-        hasPermission
+        hasPermission,
+        canAccessTab
       }}
     >
       {children}

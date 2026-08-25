@@ -59,23 +59,20 @@ export const MembersPage: React.FC<MembersPageProps> = ({
     if (!churchId) return;
     setLoading(true);
     try {
-      const [mems, depts, grps] = await Promise.all([
-        memberService.getMembers(churchId, isDemoMode, {
-          departmentId: filters.departmentId,
-          groupId: filters.groupId,
-          baptismStatus: filters.baptismStatus,
-          spiritualStatus: filters.spiritualStatus,
-          gender: filters.gender,
-          activityStatus: filters.activityStatus,
-          searchQuery: filters.searchQuery,
-        }),
+      const [memsRes, deptsRes, grpsRes] = await Promise.allSettled([
+        memberService.getMembers(churchId, isDemoMode),
         departmentGroupService.getDepartments(churchId, isDemoMode),
         departmentGroupService.getGroups(churchId, isDemoMode),
       ]);
+
+      const mems = memsRes.status === 'fulfilled' ? memsRes.value : [];
+      const depts = deptsRes.status === 'fulfilled' ? deptsRes.value : [];
+      const grps = grpsRes.status === 'fulfilled' ? grpsRes.value : [];
+
       setMembers(mems);
       setDepartments(depts);
       setGroups(grps);
-      if (mems.length > 0 && !selectedMember) {
+      if (mems.length > 0) {
         setSelectedMember(mems[0]);
       }
     } catch (err) {
@@ -87,17 +84,7 @@ export const MembersPage: React.FC<MembersPageProps> = ({
 
   useEffect(() => {
     loadData();
-  }, [
-    churchId,
-    isDemoMode,
-    filters.departmentId,
-    filters.groupId,
-    filters.baptismStatus,
-    filters.spiritualStatus,
-    filters.gender,
-    filters.activityStatus,
-    filters.searchQuery,
-  ]);
+  }, [churchId, isDemoMode]);
 
   // Advanced Filtering Logic
   const filteredMembers = useMemo(() => {

@@ -11,17 +11,21 @@ export const eventAnnouncementService = {
       return localDemoEvents.filter(e => e.church_id === churchId);
     }
 
-    const { data, error } = await supabase
-      .from('events')
-      .select('*')
-      .eq('church_id', churchId)
-      .order('start_date', { ascending: true });
+    try {
+      const { data, error } = await supabase
+        .from('events')
+        .select('*')
+        .eq('church_id', churchId)
+        .order('start_date', { ascending: true });
 
-    if (error) {
-      throw new Error(`Erreur événements : ${error.message}`);
+      if (error) {
+        return localDemoEvents.filter(e => e.church_id === churchId);
+      }
+
+      return (data || []) as ChurchEvent[];
+    } catch {
+      return localDemoEvents.filter(e => e.church_id === churchId);
     }
-
-    return (data || []) as ChurchEvent[];
   },
 
   async createEvent(
@@ -56,18 +60,22 @@ export const eventAnnouncementService = {
       return localDemoAnnouncements.filter(a => a.church_id === churchId);
     }
 
-    const { data, error } = await supabase
-      .from('announcements')
-      .select('*')
-      .eq('church_id', churchId)
-      .order('is_pinned', { ascending: false })
-      .order('published_at', { ascending: false });
+    try {
+      const { data, error } = await supabase
+        .from('announcements')
+        .select('*')
+        .eq('church_id', churchId)
+        .order('is_pinned', { ascending: false })
+        .order('published_at', { ascending: false });
 
-    if (error) {
-      throw new Error(`Erreur annonces : ${error.message}`);
+      if (error) {
+        return localDemoAnnouncements.filter(a => a.church_id === churchId);
+      }
+
+      return (data || []) as Announcement[];
+    } catch {
+      return localDemoAnnouncements.filter(a => a.church_id === churchId);
     }
-
-    return (data || []) as Announcement[];
   },
 
   async createAnnouncement(

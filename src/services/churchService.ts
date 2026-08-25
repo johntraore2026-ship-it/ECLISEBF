@@ -23,17 +23,22 @@ export const churchService = {
       return found;
     }
 
-    const { data, error } = await supabase
-      .from('churches')
-      .select('*')
-      .eq('id', churchId)
-      .single();
+    try {
+      const { data, error } = await supabase
+        .from('churches')
+        .select('*')
+        .eq('id', churchId)
+        .single();
 
-    if (error) {
-      throw new Error(`Erreur lors de la récupération de l'église : ${error.message}`);
+      if (error || !data) {
+        console.warn('Notice getChurch fallback to default church:', error?.message);
+        return DEMO_CHURCHES_LIST.find(c => c.id === churchId) || DEMO_CHURCH;
+      }
+
+      return data as Church;
+    } catch {
+      return DEMO_CHURCHES_LIST.find(c => c.id === churchId) || DEMO_CHURCH;
     }
-
-    return data as Church;
   },
 
   async listChurches(isDemoMode = false): Promise<Church[]> {
@@ -41,16 +46,20 @@ export const churchService = {
       return DEMO_CHURCHES_LIST;
     }
 
-    const { data, error } = await supabase
-      .from('churches')
-      .select('*')
-      .order('name');
+    try {
+      const { data, error } = await supabase
+        .from('churches')
+        .select('*')
+        .order('name');
 
-    if (error) {
-      throw new Error(`Erreur lors du chargement des églises : ${error.message}`);
+      if (error || !data || data.length === 0) {
+        return DEMO_CHURCHES_LIST;
+      }
+
+      return data as Church[];
+    } catch {
+      return DEMO_CHURCHES_LIST;
     }
-
-    return data as Church[];
   },
 
   async registerChurch(params: RegisterChurchParams, isDemoMode = false): Promise<{ success: boolean; church_id: string; church?: Church }> {

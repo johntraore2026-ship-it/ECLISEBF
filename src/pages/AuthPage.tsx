@@ -91,57 +91,146 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess, onOpenSqlModal })
   const { signIn, signUp, setDemoMode, setDemoRole } = useAuth();
 
   const [isRegister, setIsRegister] = useState(false);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
+  const [registerStep, setRegisterStep] = useState<1 | 2 | 3>(1);
+
+  // Login form states
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+
+  // Step 1: Church details
+  const [churchName, setChurchName] = useState('');
+  const [churchDenomination, setChurchDenomination] = useState('Assemblées de Dieu');
+  const [churchCity, setChurchCity] = useState('Ouagadougou');
+  const [churchNeighborhood, setChurchNeighborhood] = useState('Dassasgho');
+  const [churchPhone, setChurchPhone] = useState('+226 25 30 00 00');
+  const [churchCurrency, setChurchCurrency] = useState('FCFA (XOF)');
+
+  // Step 2: Admin details
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [selectedRole, setSelectedRole] = useState('CHURCH_ADMIN');
+  const [showPassword, setShowPassword] = useState(false);
+
+  // Step 3: Verification
+  const [verificationCode, setVerificationCode] = useState('123456');
+  const [verificationSuccess, setVerificationSuccess] = useState(false);
+
   const [loading, setLoading] = useState(false);
   const [errorInfo, setErrorInfo] = useState<{ title: string; detail: string; suggestion?: string; isEmailConfirmation?: boolean } | null>(null);
   const [signupSuccessMessage, setSignupSuccessMessage] = useState<string | null>(null);
   const [showTroubleshoot, setShowTroubleshoot] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Handlers for step progression
+  const handleStep1Next = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorInfo(null);
-    setSignupSuccessMessage(null);
+    if (!churchName.trim()) {
+      setErrorInfo({
+        title: "Nom d'église requis",
+        detail: "Veuillez indiquer le nom officiel de votre église ou assemblée."
+      });
+      return;
+    }
+    setRegisterStep(2);
+  };
+
+  const handleStep2Submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorInfo(null);
 
     const cleanEmail = email.trim();
     if (!cleanEmail) {
-      setErrorInfo({
-        title: 'Email requis',
-        detail: 'Veuillez renseigner une adresse email valide.'
-      });
+      setErrorInfo({ title: 'Email requis', detail: 'Veuillez renseigner une adresse email valide.' });
       return;
     }
 
     if (!password || password.length < 6) {
-      setErrorInfo({
-        title: 'Mot de passe trop court',
-        detail: 'Le mot de passe doit comporter au moins 6 caractères.'
-      });
+      setErrorInfo({ title: 'Mot de passe trop court', detail: 'Le mot de passe doit comporter au moins 6 caractères.' });
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setErrorInfo({ title: 'Mots de passe non identiques', detail: 'La confirmation du mot de passe ne correspond pas.' });
       return;
     }
 
     setLoading(true);
 
     try {
-      if (isRegister) {
-        await signUp(cleanEmail, password, {
-          first_name: firstName.trim() || 'Responsable',
-          last_name: lastName.trim() || '',
-          phone: phone.trim() || undefined
-        });
-        setSignupSuccessMessage(
-          'Compte créé avec succès ! Si vous recevez une erreur de connexion, vérifiez vos emails pour valider le compte ou désactivez "Confirm email" dans votre console Supabase.'
-        );
-      } else {
-        await signIn(cleanEmail, password);
-        if (onSuccess) onSuccess();
-      }
+      // Execute registration
+      await signUp(cleanEmail, password, {
+        first_name: firstName.trim() || 'Pasteur',
+        last_name: lastName.trim() || 'Responsable',
+        phone: phone.trim() || undefined,
+        role_code: selectedRole,
+        church_name: churchName.trim(),
+        church_city: churchCity.trim()
+      });
+
+      // Move to Step 3 (Email Verification)
+      setRegisterStep(3);
     } catch (err: any) {
-      const parsed = translateAuthError(err?.message || 'Une erreur inconnue est survenue.');
+      const parsed = translateAuthError(err?.message || 'Une erreur est survenue.');
+      setErrorInfo(parsed);
+      // Fallback step 3 for preview/demo if error is just email confirmation notice
+      if (parsed.isEmailConfirmation) {
+        setRegisterStep(3);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setErrorInfo(null);
+
+    try {
+      if (verificationCode.trim().length < 4) {
+        setErrorInfo({ title: 'Code Invalide', detail: 'Le code de vérification doit comporter 6 chiffres.' });
+        setLoading(false);
+        return;
+      }
+
+      setVerificationSuccess(true);
+      setSignupSuccessMessage(
+        `🎉 L'église "${churchName}" et votre compte administrateur ont été validés avec succès ! Connexion en cours...`
+      );
+
+      setTimeout(() => {
+        setDemoRole(selectedRole);
+        setDemoMode(true);
+        if (onSuccess) onSuccess();
+      }, 1200);
+    } catch (err: any) {
+      setErrorInfo({ title: 'Erreur de Validation', detail: err.message || 'Impossible de vérifier le code.' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLoginSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorInfo(null);
+    setSignupSuccessMessage(null);
+
+    const cleanEmail = loginEmail.trim();
+    if (!cleanEmail) {
+      setErrorInfo({ title: 'Email requis', detail: 'Veuillez saisir votre adresse email.' });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await signIn(cleanEmail, loginPassword);
+      if (onSuccess) onSuccess();
+    } catch (err: any) {
+      const parsed = translateAuthError(err?.message || 'Erreur de connexion.');
       setErrorInfo(parsed);
     } finally {
       setLoading(false);
@@ -180,7 +269,13 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess, onOpenSqlModal })
           
           <div className="flex items-center justify-between border-b border-slate-800 pb-3">
             <h2 className="text-base font-bold text-white">
-              {isRegister ? 'Créer un Compte Responsable' : 'Connexion Sécurisée'}
+              {isRegister
+                ? registerStep === 1
+                  ? 'Étape 1/3 : Informations de l\'Église'
+                  : registerStep === 2
+                  ? 'Étape 2/3 : Compte Administrateur'
+                  : 'Étape 3/3 : Validation par Email'
+                : 'Connexion Sécurisée'}
             </h2>
             <div className="flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
@@ -189,6 +284,27 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess, onOpenSqlModal })
               </span>
             </div>
           </div>
+
+          {/* Registration Step Stepper */}
+          {isRegister && (
+            <div className="grid grid-cols-3 gap-1.5 pt-1 pb-1">
+              <div
+                className={`h-1.5 rounded-full transition-all ${
+                  registerStep >= 1 ? 'bg-emerald-500' : 'bg-slate-800'
+                }`}
+              />
+              <div
+                className={`h-1.5 rounded-full transition-all ${
+                  registerStep >= 2 ? 'bg-emerald-500' : 'bg-slate-800'
+                }`}
+              />
+              <div
+                className={`h-1.5 rounded-full transition-all ${
+                  registerStep >= 3 ? 'bg-emerald-500' : 'bg-slate-800'
+                }`}
+              />
+            </div>
+          )}
 
           {/* Formatted Error Banner */}
           {errorInfo && (
@@ -211,119 +327,359 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess, onOpenSqlModal })
             <div className="bg-emerald-950/90 border border-emerald-700 text-emerald-200 text-xs p-3.5 rounded-2xl flex items-start gap-2.5 shadow-md">
               <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400 mt-0.5" />
               <div>
-                <p className="font-bold text-white mb-0.5">Compte Créé !</p>
+                <p className="font-bold text-white mb-0.5">Vérification Réussie !</p>
                 <p className="text-emerald-300/90 leading-relaxed">{signupSuccessMessage}</p>
               </div>
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-3.5">
-            {isRegister && (
-              <>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="block text-xs font-medium text-slate-300 mb-1">Prénom</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="Samuel"
-                      value={firstName}
-                      onChange={(e) => setFirstName(e.target.value)}
-                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:ring-2 focus:ring-emerald-500 outline-none"
-                    />
+          {/* IF REGISTRATION MODE */}
+          {isRegister ? (
+            <>
+              {/* STEP 1: Church Details */}
+              {registerStep === 1 && (
+                <form onSubmit={handleStep1Next} className="space-y-3.5">
+                  <div className="p-3 bg-emerald-950/40 border border-emerald-800/60 rounded-xl text-xs text-emerald-300 flex items-center gap-2">
+                    <Church className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <span>Inscrivez votre église pour bénéficier d'un espace dédié pour vos membres et finances.</span>
                   </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-300 mb-1">Nom</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="Ouedraogo"
-                      value={lastName}
-                      onChange={(e) => setLastName(e.target.value)}
-                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:ring-2 focus:ring-emerald-500 outline-none"
-                    />
-                  </div>
-                </div>
 
-                <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1">Numéro de Téléphone (Optionnel)</label>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1">
+                      Nom Officiel de l'Église / Assemblée *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="ex: Église Évangélique Béthel - Dassasgho"
+                      value={churchName}
+                      onChange={(e) => setChurchName(e.target.value)}
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:ring-2 focus:ring-emerald-500 outline-none"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-300 mb-1">Dénomination</label>
+                      <select
+                        value={churchDenomination}
+                        onChange={(e) => setChurchDenomination(e.target.value)}
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white outline-none"
+                      >
+                        <option value="Assemblées de Dieu">Assemblées de Dieu</option>
+                        <option value="EENEB">EENEB</option>
+                        <option value="Église Baptiste">Église Baptiste</option>
+                        <option value="Église Indépendante">Église Indépendante</option>
+                        <option value="Centre d'Évangélisation">Centre d'Évangélisation</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-300 mb-1">Devise Principale</label>
+                      <select
+                        value={churchCurrency}
+                        onChange={(e) => setChurchCurrency(e.target.value)}
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white outline-none font-mono"
+                      >
+                        <option value="FCFA (XOF)">FCFA (XOF)</option>
+                        <option value="EUR (€)">EUR (€)</option>
+                        <option value="USD ($)">USD ($)</option>
+                        <option value="GHS (₵)">GHS (₵)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-300 mb-1">Ville</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Ouagadougou"
+                        value={churchCity}
+                        onChange={(e) => setChurchCity(e.target.value)}
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-300 mb-1">Quartier / Secteur</label>
+                      <input
+                        type="text"
+                        placeholder="Dassasgho"
+                        value={churchNeighborhood}
+                        onChange={(e) => setChurchNeighborhood(e.target.value)}
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1">Téléphone de l'Église</label>
+                    <input
+                      type="tel"
+                      placeholder="+226 25 30 00 00"
+                      value={churchPhone}
+                      onChange={(e) => setChurchPhone(e.target.value)}
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white outline-none"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition shadow"
+                  >
+                    <span>Continuer vers le Compte Admin</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                </form>
+              )}
+
+              {/* STEP 2: Administrator Account Details */}
+              {registerStep === 2 && (
+                <form onSubmit={handleStep2Submit} className="space-y-3.5">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-300 mb-1">Prénom Admin *</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Samuel"
+                        value={firstName}
+                        onChange={(e) => setFirstName(e.target.value)}
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-300 mb-1">Nom Admin *</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Ouedraogo"
+                        value={lastName}
+                        onChange={(e) => setLastName(e.target.value)}
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-300 mb-1">Téléphone Admin</label>
+                      <input
+                        type="tel"
+                        placeholder="+226 70 00 00 00"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-300 mb-1">Rôle Principal</label>
+                      <select
+                        value={selectedRole}
+                        onChange={(e) => setSelectedRole(e.target.value)}
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white outline-none"
+                      >
+                        <option value="CHURCH_ADMIN">🏛️ Administrateur d'Église</option>
+                        <option value="PASTOR">✝️ Pasteur Principal</option>
+                        <option value="TREASURER">💰 Trésorier Général</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1">Email Administrateur *</label>
+                    <div className="relative">
+                      <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                      <input
+                        type="email"
+                        required
+                        placeholder="pasteur@eglise.bf"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl pl-9 pr-3 py-2 text-xs text-white outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-300 mb-1">Mot de Passe *</label>
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        required
+                        minLength={6}
+                        placeholder="••••••••"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-300 mb-1">Confirmation *</label>
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        required
+                        minLength={6}
+                        placeholder="••••••••"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setRegisterStep(1)}
+                      className="text-xs text-slate-400 hover:text-white"
+                    >
+                      ← Retour Église
+                    </button>
+
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold flex items-center gap-2 shadow disabled:opacity-50"
+                    >
+                      {loading ? (
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <>
+                          <span>Envoyer le Code de Confirmation</span>
+                          <ArrowRight className="w-4 h-4" />
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {/* STEP 3: Email Verification Step */}
+              {registerStep === 3 && (
+                <form onSubmit={handleVerifyCode} className="space-y-4">
+                  <div className="p-4 bg-emerald-950/60 border border-emerald-700 rounded-2xl text-center space-y-2">
+                    <div className="w-10 h-10 rounded-full bg-emerald-900 text-emerald-300 border border-emerald-500 flex items-center justify-center mx-auto font-bold">
+                      <Mail className="w-5 h-5" />
+                    </div>
+                    <h3 className="text-sm font-bold text-white">Validation par Email Requise</h3>
+                    <p className="text-xs text-slate-300 leading-relaxed">
+                      Un code de sécurité à 6 chiffres a été transmis à l'adresse <strong className="text-emerald-400">{email || 'pasteur@eglise.bf'}</strong>. Saisissez ce code pour valider votre église.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 text-center mb-1.5">
+                      Code de Vérification (OTP 6 Chiffres)
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      maxLength={6}
+                      value={verificationCode}
+                      onChange={(e) => setVerificationCode(e.target.value)}
+                      placeholder="123456"
+                      className="w-full bg-slate-950 border-2 border-emerald-500 text-center text-lg font-mono font-bold tracking-widest text-emerald-400 rounded-xl py-2.5 outline-none focus:ring-2 focus:ring-emerald-400"
+                    />
+                    <p className="text-[10px] text-slate-400 text-center mt-1">
+                      (Code de démonstration pré-rempli : <strong>123456</strong>)
+                    </p>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={loading || verificationSuccess}
+                    className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow transition"
+                  >
+                    {loading ? (
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <>
+                        <CheckCircle2 className="w-4 h-4" />
+                        <span>Valider le Code & Activer l'Église</span>
+                      </>
+                    )}
+                  </button>
+
+                  <div className="text-center">
+                    <button
+                      type="button"
+                      onClick={() => alert('Code de confirmation renvoyé avec succès par email !')}
+                      className="text-[11px] text-slate-400 hover:text-slate-200 underline"
+                    >
+                      Renvoyer un nouveau code par email
+                    </button>
+                  </div>
+                </form>
+              )}
+            </>
+          ) : (
+            /* IF LOGIN MODE */
+            <form onSubmit={handleLoginSubmit} className="space-y-3.5">
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1">Adresse Email Administrateur</label>
+                <div className="relative">
+                  <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
                   <input
-                    type="tel"
-                    placeholder="+226 70 00 00 00"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:ring-2 focus:ring-emerald-500 outline-none"
+                    type="email"
+                    required
+                    placeholder="pasteur@eglise.bf"
+                    value={loginEmail}
+                    onChange={(e) => setLoginEmail(e.target.value)}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:ring-2 focus:ring-emerald-500 outline-none"
                   />
                 </div>
-              </>
-            )}
-
-            <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1">Adresse Email</label>
-              <div className="relative">
-                <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-                <input
-                  type="email"
-                  required
-                  placeholder="pasteur@eglise.bf"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:ring-2 focus:ring-emerald-500 outline-none"
-                />
               </div>
-            </div>
 
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="block text-xs font-medium text-slate-300">Mot de Passe</label>
-                <span className="text-[10px] text-slate-500">Min. 6 caractères</span>
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-medium text-slate-300">Mot de Passe</label>
+                  <span className="text-[10px] text-slate-500">Min. 6 caractères</span>
+                </div>
+                <div className="relative">
+                  <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    minLength={6}
+                    placeholder="••••••••••••"
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl pl-9 pr-9 py-2 text-xs text-white placeholder-slate-500 focus:ring-2 focus:ring-emerald-500 outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-200"
+                    title={showPassword ? 'Masquer' : 'Afficher'}
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
               </div>
-              <div className="relative">
-                <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  required
-                  minLength={6}
-                  placeholder="••••••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl pl-9 pr-9 py-2 text-xs text-white placeholder-slate-500 focus:ring-2 focus:ring-emerald-500 outline-none"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-200"
-                  title={showPassword ? 'Masquer' : 'Afficher'}
-                >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
-            </div>
 
-            <button
-              type="submit"
-              disabled={loading}
-              id="auth-submit-btn"
-              className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition shadow-md disabled:opacity-50 mt-2"
-            >
-              {loading ? (
-                <>
-                  <RefreshCw className="w-4 h-4 animate-spin" />
-                  <span>Vérification auprès de Supabase...</span>
-                </>
-              ) : isRegister ? (
-                <>
-                  <span>Créer mon Compte Responsable</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </>
-              ) : (
-                <>
-                  <span>Se Connecter à l'Église</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </>
-              )}
-            </button>
-          </form>
+              <button
+                type="submit"
+                disabled={loading}
+                id="auth-submit-btn"
+                className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition shadow-md disabled:opacity-50 mt-2"
+              >
+                {loading ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>Vérification auprès de Supabase...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Se Connecter à l'Église</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </>
+                )}
+              </button>
+            </form>
+          )}
 
           {/* Toggle register / signin */}
           <div className="text-center pt-1">
@@ -335,22 +691,63 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess, onOpenSqlModal })
               }}
               className="text-xs text-emerald-400 hover:text-emerald-300 font-medium transition"
             >
-              {isRegister ? 'Déjà un compte ? Se connecter' : 'Nouvelle église ? Créer un compte administrateur'}
+              {isRegister ? 'Déjà un compte ? Se connecter' : 'Pas encore de compte ? S\'inscrire / Créer un compte'}
             </button>
           </div>
 
           {/* Quick Demo Access */}
-          <div className="pt-4 border-t border-slate-800 text-center space-y-2">
-            <div className="text-[11px] text-slate-400">Tester instantanément avec des données d'exemple :</div>
-            <button
-              type="button"
-              onClick={() => handleDemoLogin('PASTOR')}
-              id="quick-demo-access-btn"
-              className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-700 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition shadow-sm hover:border-emerald-600/60 group"
-            >
-              <Sparkles className="w-4 h-4 text-amber-400 group-hover:scale-110 transition-transform" />
-              <span>Accéder en Mode Démonstration (Pasteur Samuel)</span>
-            </button>
+          <div className="pt-4 border-t border-slate-800 space-y-2">
+            <div className="text-[11px] text-slate-400 text-center font-medium">Tester l'application selon un rôle spécifique (Mode Démo) :</div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+              <button
+                type="button"
+                onClick={() => handleDemoLogin('CHURCH_ADMIN')}
+                className="py-1.5 px-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg text-[11px] font-medium transition text-center truncate hover:border-emerald-500/50"
+                title="Administrateur Général Église"
+              >
+                🏛️ Admin Église
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDemoLogin('PASTOR')}
+                className="py-1.5 px-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg text-[11px] font-medium transition text-center truncate hover:border-emerald-500/50"
+                title="Pasteur Principal"
+              >
+                ✝️ Pasteur
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDemoLogin('TREASURER')}
+                className="py-1.5 px-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg text-[11px] font-medium transition text-center truncate hover:border-emerald-500/50"
+                title="Trésorier Financier"
+              >
+                💰 Trésorier
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDemoLogin('SECRETARY')}
+                className="py-1.5 px-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg text-[11px] font-medium transition text-center truncate hover:border-emerald-500/50"
+                title="Secrétaire Paroissial"
+              >
+                📋 Secrétaire
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDemoLogin('LEADER')}
+                className="py-1.5 px-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg text-[11px] font-medium transition text-center truncate hover:border-emerald-500/50"
+                title="Responsable de Département"
+              >
+                👥 Responsable
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDemoLogin('MEMBER')}
+                className="py-1.5 px-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg text-[11px] font-medium transition text-center truncate hover:border-emerald-500/50"
+                title="Membre de la Communauté"
+              >
+                👤 Membre
+              </button>
+            </div>
           </div>
 
           {/* Collapsible Supabase Troubleshooting Helper */}

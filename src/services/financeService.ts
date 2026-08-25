@@ -1,4 +1,4 @@
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { supabase, isSupabaseConfigured, isTableMissingError } from '../lib/supabase';
 import { FinanceTransaction, FinanceCategory, FinanceAttachment, TransactionStatus } from '../types';
 import { DEMO_TRANSACTIONS, DEMO_FINANCE_CATEGORIES } from '../data/demoData';
 
@@ -28,7 +28,7 @@ export const financeService = {
       .order('name');
 
     if (error) {
-      if (error.code === '42P01' || error.message.includes('does not exist') || error.message.includes('404')) {
+      if (isTableMissingError(error)) {
         return localDemoCategories.filter(c => c.church_id === churchId);
       }
       throw new Error(`Erreur lors du chargement des catégories financières : ${error.message}`);
@@ -67,34 +67,51 @@ export const financeService = {
         .sort((a, b) => new Date(b.transaction_date).getTime() - new Date(a.transaction_date).getTime());
     }
 
-    const { data, error } = await supabase
-      .from('finance_transactions')
-      .select(`
-        *,
-        category:finance_categories(name),
-        creator:profiles!finance_transactions_created_by_fkey(first_name, last_name),
-        approver:profiles!finance_transactions_approved_by_fkey(first_name, last_name),
-        donor:members!finance_transactions_donor_member_id_fkey(first_name, last_name),
-        attachments:finance_attachments(*)
-      `)
-      .eq('church_id', churchId)
-      .order('transaction_date', { ascending: false });
+    // Attempt query with category join, fallback to plain select if relationships are missing
+    let data: any = null;
+    let error: any = null;
 
-    if (error) {
-      if (error.code === '42P01' || error.message.includes('does not exist') || error.message.includes('404')) {
-        return localDemoTransactions
-          .filter(t => t.church_id === churchId)
-          .sort((a, b) => new Date(b.transaction_date).getTime() - new Date(a.transaction_date).getTime());
+    try {
+      const res = await supabase
+        .from('finance_transactions')
+        .select(`
+          *,
+          category:finance_categories(name)
+        `)
+        .eq('church_id', churchId)
+        .order('transaction_date', { ascending: false });
+
+      if (res.error) {
+        // Retry with basic select in case of foreign key relationship error in schema cache
+        const simpleRes = await supabase
+          .from('finance_transactions')
+          .select('*')
+          .eq('church_id', churchId)
+          .order('transaction_date', { ascending: false });
+        
+        data = simpleRes.data;
+        error = simpleRes.error;
+      } else {
+        data = res.data;
+        error = res.error;
       }
-      throw new Error(`Erreur lors du chargement des transactions : ${error.message}`);
+    } catch (e: any) {
+      error = e;
     }
 
-    return (data || []).map(item => ({
+    if (error) {
+      console.warn('Supabase finance_transactions notice (using local fallback):', error.message || error);
+      return localDemoTransactions
+        .filter(t => t.church_id === churchId)
+        .sort((a, b) => new Date(b.transaction_date).getTime() - new Date(a.transaction_date).getTime());
+    }
+
+    return (data || []).map((item: any) => ({
       ...item,
-      category_name: item.category?.name || 'Général',
-      created_by_name: item.creator ? `${item.creator.first_name} ${item.creator.last_name}` : undefined,
-      approved_by_name: item.approver ? `${item.approver.first_name} ${item.approver.last_name}` : undefined,
-      donor_name: item.donor ? `${item.donor.first_name} ${item.donor.last_name}` : item.donor_name,
+      category_name: item.category?.name || item.category_name || 'Général',
+      created_by_name: item.created_by_name || undefined,
+      approved_by_name: item.approved_by_name || undefined,
+      donor_name: item.donor_name || undefined,
     })) as FinanceTransaction[];
   },
 

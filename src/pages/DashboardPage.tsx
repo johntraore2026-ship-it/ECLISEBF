@@ -21,7 +21,8 @@ import { memberService } from '../services/memberService';
 import { financeService, FinanceSummary } from '../services/financeService';
 import { attendanceService } from '../services/attendanceService';
 import { pastoralService } from '../services/pastoralService';
-import { Member, AttendanceSession, FinanceTransaction, PastoralRecord } from '../types';
+import { eventAnnouncementService } from '../services/eventAnnouncementService';
+import { Member, AttendanceSession, FinanceTransaction, PastoralRecord, ChurchEvent } from '../types';
 import { AnalyticsSummaryCard } from '../components/dashboard/AnalyticsSummaryCard';
 
 interface DashboardPageProps {
@@ -39,7 +40,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
   onOpenAddPastoral,
   setActiveTab,
 }) => {
-  const { currentChurch, churchId, isDemoMode, hasRole } = useAuth();
+  const { currentChurch, churchId, isDemoMode, hasRole, hasPermission, canAccessTab } = useAuth();
 
   const [members, setMembers] = useState<Member[]>([]);
   const [financeSummary, setFinanceSummary] = useState<FinanceSummary | null>(null);
@@ -47,18 +48,29 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
   const [allTransactions, setAllTransactions] = useState<FinanceTransaction[]>([]);
   const [attendanceSessions, setAttendanceSessions] = useState<AttendanceSession[]>([]);
   const [pastoralRecords, setPastoralRecords] = useState<PastoralRecord[]>([]);
+  const [events, setEvents] = useState<ChurchEvent[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const canFinance = canAccessTab('finance');
+  const canPastoral = canAccessTab('pastoral');
+  const canMembers = canAccessTab('members');
+
+  const canAddMember = hasPermission('members.create');
+  const canAddFinance = canFinance && hasPermission('finance.create');
+  const canAddAttendance = hasPermission('attendance.create');
+  const canAddPastoral = canPastoral && hasPermission('pastoral.create');
 
   const loadData = async () => {
     if (!churchId) return;
     setLoading(true);
     try {
-      const [mems, fSummary, fTxs, atts, pRecs] = await Promise.all([
+      const [mems, fSummary, fTxs, atts, pRecs, evs] = await Promise.all([
         memberService.getMembers(churchId, isDemoMode),
         financeService.computeSummary(churchId, isDemoMode),
         financeService.getTransactions(churchId, isDemoMode),
         attendanceService.getSessions(churchId, isDemoMode),
         pastoralService.getRecords(churchId, isDemoMode).catch(() => []),
+        eventAnnouncementService.getEvents(churchId, isDemoMode).catch(() => []),
       ]);
 
       setMembers(mems);
@@ -67,6 +79,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
       setRecentTransactions(fTxs.slice(0, 5));
       setAttendanceSessions(atts);
       setPastoralRecords(pRecs);
+      setEvents(evs);
     } catch (err) {
       console.error('Error loading dashboard data:', err);
     } finally {
@@ -81,6 +94,24 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
   const lastSession = attendanceSessions[0];
   const activeMembersCount = members.filter(m => m.is_active).length;
   const newConvertsCount = members.filter(m => m.spiritual_status === 'NEW_CONVERT' || m.spiritual_status === 'INQUIRER').length;
+
+  // Monthly income calculation (current month or active month transactions)
+  const currentMonthStr = new Date().toISOString().substring(0, 7); // e.g. "2026-08"
+  const monthlyTransactions = allTransactions.filter(
+    (t) => t.transaction_type === 'INCOME' && (t.status === 'APPROVED' || t.status === 'PENDING_APPROVAL')
+  );
+  const currentMonthIncome = monthlyTransactions
+    .filter((t) => t.transaction_date && t.transaction_date.startsWith(currentMonthStr))
+    .reduce((sum, t) => sum + Number(t.amount || 0), 0);
+
+  const displayMonthlyIncome = currentMonthIncome > 0 ? currentMonthIncome : (financeSummary?.totalIncome || 0);
+
+  // Next upcoming event
+  const todayStr = new Date().toISOString().split('T')[0];
+  const upcomingEvents = events
+    .filter((e) => e.start_date >= todayStr)
+    .sort((a, b) => a.start_date.localeCompare(b.start_date));
+  const nextEvent = upcomingEvents.length > 0 ? upcomingEvents[0] : (events[0] || null);
 
   return (
     <div className="space-y-6 pb-12">
@@ -108,115 +139,146 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
 
           {/* Quick Action Buttons */}
           <div className="flex flex-wrap items-center gap-2">
-            <button
-              onClick={onOpenAddMember}
-              id="dashboard-quick-member-btn"
-              className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow transition"
-            >
-              <PlusCircle className="w-4 h-4" />
-              Nouveau Membre
-            </button>
-            <button
-              onClick={onOpenAddFinance}
-              id="dashboard-quick-finance-btn"
-              className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition"
-            >
-              <Wallet className="w-4 h-4 text-emerald-400" />
-              Saisie Dîme/Dépense
-            </button>
-            <button
-              onClick={onOpenAddAttendance}
-              id="dashboard-quick-attendance-btn"
-              className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition"
-            >
-              <CalendarCheck className="w-4 h-4 text-emerald-400" />
-              Pointage Culte
-            </button>
+            {canAddMember && (
+              <button
+                onClick={onOpenAddMember}
+                id="dashboard-quick-member-btn"
+                className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow transition"
+              >
+                <PlusCircle className="w-4 h-4" />
+                Nouveau Membre
+              </button>
+            )}
+            {canAddFinance && (
+              <button
+                onClick={onOpenAddFinance}
+                id="dashboard-quick-finance-btn"
+                className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition"
+              >
+                <Wallet className="w-4 h-4 text-emerald-400" />
+                Saisie Dîme/Dépense
+              </button>
+            )}
+            {canAddAttendance && (
+              <button
+                onClick={onOpenAddAttendance}
+                id="dashboard-quick-attendance-btn"
+                className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition"
+              >
+                <CalendarCheck className="w-4 h-4 text-emerald-400" />
+                Pointage Culte
+              </button>
+            )}
           </div>
         </div>
       </div>
 
-      {/* KPI Cards Grid */}
+      {/* KPI Cards Grid (Direct real-time indicators) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         
-        {/* KPI 1: Membres Totaux */}
+        {/* KPI 1: Membres Actifs (Real-Time) */}
         <div
           onClick={() => setActiveTab('members')}
-          className="bg-slate-900/90 border border-slate-800 p-5 rounded-2xl hover:border-emerald-500/50 cursor-pointer transition shadow-sm"
+          id="kpi-card-active-members"
+          className="bg-slate-900/90 border border-slate-800 p-5 rounded-2xl hover:border-emerald-500/50 cursor-pointer transition shadow-sm group"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Membres Actifs</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-400 group-hover:text-emerald-400 transition">
+              Membres Actifs
+            </span>
             <div className="p-2 rounded-xl bg-emerald-950 border border-emerald-800/60 text-emerald-400">
               <Users className="w-5 h-5" />
             </div>
           </div>
           <div className="mt-3">
-            <div className="text-2xl font-extrabold text-white">{activeMembersCount}</div>
+            <div className="text-2xl font-extrabold text-white flex items-baseline gap-2">
+              {activeMembersCount}
+              <span className="text-xs font-medium text-slate-400">fidèles enregistrés</span>
+            </div>
             <div className="text-xs text-slate-400 mt-1 flex items-center gap-1">
-              <span className="text-emerald-400 font-semibold">{newConvertsCount}</span> nouveaux convertis
+              <span className="text-emerald-400 font-semibold">+{newConvertsCount}</span> nouveaux convertis
             </div>
           </div>
         </div>
 
-        {/* KPI 2: Dernier Culte */}
-        <div
-          onClick={() => setActiveTab('attendance')}
-          className="bg-slate-900/90 border border-slate-800 p-5 rounded-2xl hover:border-emerald-500/50 cursor-pointer transition shadow-sm"
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Dernier Culte</span>
-            <div className="p-2 rounded-xl bg-blue-950 border border-blue-800/60 text-blue-400">
-              <CalendarCheck className="w-5 h-5" />
-            </div>
-          </div>
-          <div className="mt-3">
-            <div className="text-2xl font-extrabold text-white">
-              {lastSession ? lastSession.total_count : 0} <span className="text-xs font-normal text-slate-400">fidèles</span>
-            </div>
-            <div className="text-xs text-slate-400 mt-1 truncate">
-              {lastSession ? `${lastSession.visitors_count} visiteurs • ${lastSession.title}` : 'Aucune session'}
-            </div>
-          </div>
-        </div>
-
-        {/* KPI 3: Solde & Recettes Financières */}
+        {/* KPI 2: Total Revenus Mensuels (Real-Time) */}
         <div
           onClick={() => setActiveTab('finance')}
-          className="bg-slate-900/90 border border-slate-800 p-5 rounded-2xl hover:border-emerald-500/50 cursor-pointer transition shadow-sm"
+          id="kpi-card-monthly-revenue"
+          className="bg-slate-900/90 border border-slate-800 p-5 rounded-2xl hover:border-emerald-500/50 cursor-pointer transition shadow-sm group"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Recettes Encaissées</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-400 group-hover:text-amber-400 transition">
+              Revenus Mensuels (Mois)
+            </span>
             <div className="p-2 rounded-xl bg-amber-950 border border-amber-800/60 text-amber-400">
               <Wallet className="w-5 h-5" />
             </div>
           </div>
           <div className="mt-3">
             <div className="text-2xl font-extrabold text-white">
-              {(financeSummary?.totalIncome || 0).toLocaleString('fr-FR')} <span className="text-xs font-normal text-amber-400">FCFA</span>
+              {displayMonthlyIncome.toLocaleString('fr-FR')} <span className="text-xs font-normal text-amber-400 font-sans">FCFA</span>
             </div>
             <div className="text-xs text-slate-400 mt-1 flex items-center justify-between">
-              <span>Dîmes : {(financeSummary?.tithesTotal || 0).toLocaleString('fr-FR')} F</span>
+              <span>Total Global : {(financeSummary?.totalIncome || 0).toLocaleString('fr-FR')} F</span>
             </div>
           </div>
         </div>
 
-        {/* KPI 4: Approbations en Attente */}
+        {/* KPI 3: Prochain Événement à Venir (Real-Time) */}
         <div
-          onClick={() => setActiveTab('finance')}
-          className="bg-slate-900/90 border border-slate-800 p-5 rounded-2xl hover:border-emerald-500/50 cursor-pointer transition shadow-sm"
+          onClick={() => setActiveTab('events')}
+          id="kpi-card-next-event"
+          className="bg-slate-900/90 border border-slate-800 p-5 rounded-2xl hover:border-emerald-500/50 cursor-pointer transition shadow-sm group"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Circuit Approbation</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-400 group-hover:text-purple-400 transition">
+              Prochain Événement
+            </span>
             <div className="p-2 rounded-xl bg-purple-950 border border-purple-800/60 text-purple-400">
+              <CalendarCheck className="w-5 h-5" />
+            </div>
+          </div>
+          <div className="mt-3">
+            {nextEvent ? (
+              <>
+                <div className="text-sm font-bold text-white truncate" title={nextEvent.title}>
+                  {nextEvent.title}
+                </div>
+                <div className="text-xs text-purple-300 mt-1 font-medium flex items-center justify-between truncate">
+                  <span>📅 {nextEvent.start_date}</span>
+                  <span className="text-slate-400 text-[10px] truncate max-w-[110px]">{nextEvent.location}</span>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="text-sm font-semibold text-slate-400">Aucun événement planifié</div>
+                <div className="text-xs text-slate-500 mt-1">Cliquer pour planifier</div>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* KPI 4: Circuit Approbation & Dernier Culte */}
+        <div
+          onClick={() => setActiveTab('attendance')}
+          id="kpi-card-attendance-approvals"
+          className="bg-slate-900/90 border border-slate-800 p-5 rounded-2xl hover:border-emerald-500/50 cursor-pointer transition shadow-sm group"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-400 group-hover:text-blue-400 transition">
+              Dernier Culte & Approbations
+            </span>
+            <div className="p-2 rounded-xl bg-blue-950 border border-blue-800/60 text-blue-400">
               <Clock className="w-5 h-5" />
             </div>
           </div>
           <div className="mt-3">
             <div className="text-2xl font-extrabold text-white">
-              {financeSummary?.pendingApprovalsCount || 0} <span className="text-xs font-normal text-slate-400">dépenses en attente</span>
+              {lastSession ? lastSession.total_count : 0} <span className="text-xs font-normal text-slate-400">fidèles présents</span>
             </div>
-            <div className="text-xs text-amber-400 mt-1 font-medium">
-              {(financeSummary?.pendingApprovalsAmount || 0).toLocaleString('fr-FR')} FCFA à valider
+            <div className="text-xs text-amber-400 mt-1 font-medium truncate">
+              {financeSummary?.pendingApprovalsCount || 0} dépenses en attente de validation
             </div>
           </div>
         </div>

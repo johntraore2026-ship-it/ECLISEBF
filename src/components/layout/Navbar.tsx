@@ -38,7 +38,8 @@ export const Navbar: React.FC<NavbarProps> = ({
     signOut,
     isDemoMode,
     isConfigured,
-    demoRole
+    demoRole,
+    setDemoRole
   } = useAuth();
 
   const [churches, setChurches] = useState<Church[]>([]);
@@ -163,10 +164,24 @@ export const Navbar: React.FC<NavbarProps> = ({
               <span>RLS & Sécurité</span>
             </button>
 
-            {/* Role Badge */}
-            <div className="hidden md:flex items-center bg-slate-800 px-2.5 py-1 rounded-md border border-slate-700 text-xs">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 mr-2"></span>
-              <span className="text-slate-300 font-medium">{userRoleName}</span>
+            {/* Interactive Role Selector */}
+            <div className="hidden md:flex items-center bg-slate-800 px-2.5 py-1 rounded-lg border border-slate-700 text-xs gap-1.5 shadow-sm">
+              <span className="h-2 w-2 rounded-full bg-emerald-400 shrink-0"></span>
+              <span className="text-slate-400 text-[11px] font-medium">Rôle:</span>
+              <select
+                id="header-role-selector"
+                value={roles[0]?.code || demoRole || 'CHURCH_ADMIN'}
+                onChange={(e) => setDemoRole(e.target.value)}
+                className="bg-transparent text-emerald-300 font-semibold border-none outline-none cursor-pointer text-xs focus:ring-0"
+                title="Changer le rôle actif pour tester les autorisations"
+              >
+                <option value="CHURCH_ADMIN" className="bg-slate-900 text-white">🏛️ Admin Église</option>
+                <option value="PASTOR" className="bg-slate-900 text-white">✝️ Pasteur / Spirituel</option>
+                <option value="TREASURER" className="bg-slate-900 text-white">💰 Trésorier / Finances</option>
+                <option value="SECRETARY" className="bg-slate-900 text-white">📋 Secrétaire / Présences</option>
+                <option value="LEADER" className="bg-slate-900 text-white">👥 Resp. Département</option>
+                <option value="MEMBER" className="bg-slate-900 text-white">👤 Membre</option>
+              </select>
             </div>
 
             {/* User Dropdown */}

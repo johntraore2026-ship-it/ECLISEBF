@@ -297,6 +297,18 @@ export interface PrayerRequest {
   updated_at: string;
 }
 
+export interface CourseEnrollment {
+  id: UUID;
+  course_id: UUID;
+  member_id: UUID;
+  member_name: string;
+  member_phone?: string;
+  member_email?: string;
+  enrolled_at: string;
+  status: 'ENROLLED' | 'IN_PROGRESS' | 'COMPLETED' | 'DROPPED';
+  progress_percentage: number;
+}
+
 export interface Course {
   id: UUID;
   church_id: UUID;
@@ -360,11 +372,18 @@ export interface Certificate {
   pdf_url?: string;
 }
 
+export interface MediaCategory {
+  id: string;
+  name: string;
+  code: string;
+  description?: string;
+}
+
 export interface MediaItem {
   id: UUID;
   church_id: UUID;
   title: string;
-  category: 'SERMON' | 'AUDIO_TEACHING' | 'BULLETIN' | 'DOCUMENT' | 'PHOTO' | 'LIVESTREAM';
+  category: string;
   description?: string;
   preacher_name?: string;
   media_date: string;
@@ -375,6 +394,10 @@ export interface MediaItem {
   is_public: boolean;
   views_count: number;
   created_at: string;
+  educational_link_url?: string;
+  bible_references?: string;
+  study_notes_url?: string;
+  reference_books?: string;
 }
 
 export interface ChurchEvent {

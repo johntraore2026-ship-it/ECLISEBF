@@ -9,6 +9,7 @@ import {
   Zap,
   Sparkles
 } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface QuickActionFloatingButtonProps {
   onOpenAddAttendance: () => void;
@@ -23,6 +24,7 @@ export const QuickActionFloatingButton: React.FC<QuickActionFloatingButtonProps>
   onOpenAddMember,
   onOpenAddFinance,
 }) => {
+  const { hasPermission, canAccessTab } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
 
   // Close on Escape key press
@@ -40,6 +42,15 @@ export const QuickActionFloatingButton: React.FC<QuickActionFloatingButtonProps>
     setIsOpen(false);
     action();
   };
+
+  const canAddAttendance = hasPermission('attendance.create');
+  const canAddPastoral = canAccessTab('pastoral') && hasPermission('pastoral.create');
+  const canAddMember = hasPermission('members.create');
+  const canAddFinance = canAccessTab('finance') && hasPermission('finance.create');
+
+  const hasAnyAction = canAddAttendance || canAddPastoral || canAddMember || canAddFinance;
+
+  if (!hasAnyAction) return null;
 
   return (
     <>
@@ -59,80 +70,88 @@ export const QuickActionFloatingButton: React.FC<QuickActionFloatingButtonProps>
           <div className="flex flex-col items-end gap-2.5 mb-1 animate-in slide-in-from-bottom-5 duration-200">
             
             {/* 1. Record Attendance */}
-            <button
-              onClick={() => handleAction(onOpenAddAttendance)}
-              id="fab-action-attendance"
-              className="flex items-center gap-3 bg-slate-900 hover:bg-slate-800 text-white pl-4 pr-3 py-2.5 rounded-2xl border border-slate-700/90 shadow-2xl transition hover:scale-105 group"
-            >
-              <div className="text-right">
-                <div className="text-xs font-bold text-slate-100 group-hover:text-emerald-400 transition">
-                  Enregistrer une Présence
+            {canAddAttendance && (
+              <button
+                onClick={() => handleAction(onOpenAddAttendance)}
+                id="fab-action-attendance"
+                className="flex items-center gap-3 bg-slate-900 hover:bg-slate-800 text-white pl-4 pr-3 py-2.5 rounded-2xl border border-slate-700/90 shadow-2xl transition hover:scale-105 group"
+              >
+                <div className="text-right">
+                  <div className="text-xs font-bold text-slate-100 group-hover:text-emerald-400 transition">
+                    Enregistrer une Présence
+                  </div>
+                  <div className="text-[10px] text-slate-400">
+                    Culte dominical ou prière de semaine
+                  </div>
                 </div>
-                <div className="text-[10px] text-slate-400">
-                  Culte dominical ou prière de semaine
+                <div className="w-9 h-9 rounded-xl bg-emerald-600/90 text-white flex items-center justify-center shadow-md group-hover:bg-emerald-500 transition">
+                  <CalendarCheck className="w-5 h-5" />
                 </div>
-              </div>
-              <div className="w-9 h-9 rounded-xl bg-emerald-600/90 text-white flex items-center justify-center shadow-md group-hover:bg-emerald-500 transition">
-                <CalendarCheck className="w-5 h-5" />
-              </div>
-            </button>
+              </button>
+            )}
 
             {/* 2. Create Pastoral Note */}
-            <button
-              onClick={() => handleAction(onOpenAddPastoral)}
-              id="fab-action-pastoral"
-              className="flex items-center gap-3 bg-slate-900 hover:bg-slate-800 text-white pl-4 pr-3 py-2.5 rounded-2xl border border-slate-700/90 shadow-2xl transition hover:scale-105 group"
-            >
-              <div className="text-right">
-                <div className="text-xs font-bold text-slate-100 group-hover:text-purple-400 transition">
-                  Nouvelle Note Pastorale
+            {canAddPastoral && (
+              <button
+                onClick={() => handleAction(onOpenAddPastoral)}
+                id="fab-action-pastoral"
+                className="flex items-center gap-3 bg-slate-900 hover:bg-slate-800 text-white pl-4 pr-3 py-2.5 rounded-2xl border border-slate-700/90 shadow-2xl transition hover:scale-105 group"
+              >
+                <div className="text-right">
+                  <div className="text-xs font-bold text-slate-100 group-hover:text-purple-400 transition">
+                    Nouvelle Note Pastorale
+                  </div>
+                  <div className="text-[10px] text-slate-400">
+                    Visite, entretien ou intercession
+                  </div>
                 </div>
-                <div className="text-[10px] text-slate-400">
-                  Visite, entretien ou intercession
+                <div className="w-9 h-9 rounded-xl bg-purple-600/90 text-white flex items-center justify-center shadow-md group-hover:bg-purple-500 transition">
+                  <HeartHandshake className="w-5 h-5" />
                 </div>
-              </div>
-              <div className="w-9 h-9 rounded-xl bg-purple-600/90 text-white flex items-center justify-center shadow-md group-hover:bg-purple-500 transition">
-                <HeartHandshake className="w-5 h-5" />
-              </div>
-            </button>
+              </button>
+            )}
 
             {/* 3. Add Member */}
-            <button
-              onClick={() => handleAction(onOpenAddMember)}
-              id="fab-action-member"
-              className="flex items-center gap-3 bg-slate-900 hover:bg-slate-800 text-white pl-4 pr-3 py-2.5 rounded-2xl border border-slate-700/90 shadow-2xl transition hover:scale-105 group"
-            >
-              <div className="text-right">
-                <div className="text-xs font-bold text-slate-100 group-hover:text-blue-400 transition">
-                  Ajouter un Membre
+            {canAddMember && (
+              <button
+                onClick={() => handleAction(onOpenAddMember)}
+                id="fab-action-member"
+                className="flex items-center gap-3 bg-slate-900 hover:bg-slate-800 text-white pl-4 pr-3 py-2.5 rounded-2xl border border-slate-700/90 shadow-2xl transition hover:scale-105 group"
+              >
+                <div className="text-right">
+                  <div className="text-xs font-bold text-slate-100 group-hover:text-blue-400 transition">
+                    Ajouter un Membre
+                  </div>
+                  <div className="text-[10px] text-slate-400">
+                    Fiche nominative et contact
+                  </div>
                 </div>
-                <div className="text-[10px] text-slate-400">
-                  Fiche nominative et contact
+                <div className="w-9 h-9 rounded-xl bg-blue-600/90 text-white flex items-center justify-center shadow-md group-hover:bg-blue-500 transition">
+                  <UserPlus className="w-5 h-5" />
                 </div>
-              </div>
-              <div className="w-9 h-9 rounded-xl bg-blue-600/90 text-white flex items-center justify-center shadow-md group-hover:bg-blue-500 transition">
-                <UserPlus className="w-5 h-5" />
-              </div>
-            </button>
+              </button>
+            )}
 
             {/* 4. Saisie Trésorerie */}
-            <button
-              onClick={() => handleAction(onOpenAddFinance)}
-              id="fab-action-finance"
-              className="flex items-center gap-3 bg-slate-900 hover:bg-slate-800 text-white pl-4 pr-3 py-2.5 rounded-2xl border border-slate-700/90 shadow-2xl transition hover:scale-105 group"
-            >
-              <div className="text-right">
-                <div className="text-xs font-bold text-slate-100 group-hover:text-amber-400 transition">
-                  Saisie Recette / Dépense
+            {canAddFinance && (
+              <button
+                onClick={() => handleAction(onOpenAddFinance)}
+                id="fab-action-finance"
+                className="flex items-center gap-3 bg-slate-900 hover:bg-slate-800 text-white pl-4 pr-3 py-2.5 rounded-2xl border border-slate-700/90 shadow-2xl transition hover:scale-105 group"
+              >
+                <div className="text-right">
+                  <div className="text-xs font-bold text-slate-100 group-hover:text-amber-400 transition">
+                    Saisie Recette / Dépense
+                  </div>
+                  <div className="text-[10px] text-slate-400">
+                    Dîmes, offrandes et factures
+                  </div>
                 </div>
-                <div className="text-[10px] text-slate-400">
-                  Dîmes, offrandes et factures
+                <div className="w-9 h-9 rounded-xl bg-amber-600/90 text-white flex items-center justify-center shadow-md group-hover:bg-amber-500 transition">
+                  <Wallet className="w-5 h-5" />
                 </div>
-              </div>
-              <div className="w-9 h-9 rounded-xl bg-amber-600/90 text-white flex items-center justify-center shadow-md group-hover:bg-amber-500 transition">
-                <Wallet className="w-5 h-5" />
-              </div>
-            </button>
+              </button>
+            )}
 
           </div>
         )}
