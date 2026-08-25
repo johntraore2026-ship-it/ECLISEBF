@@ -133,17 +133,38 @@ export const trainingService = {
           delete insertPayload.church_id;
         }
 
+        console.log('[trainingService.createCourse] Submitting to Supabase:', insertPayload);
+
         const { data, error } = await supabase
           .from('courses')
           .insert([insertPayload])
           .select()
           .single();
 
-        if (!error && data) {
+        if (error) {
+          console.error('[Supabase createCourse Insert Error]:', {
+            message: error.message,
+            code: error.code,
+            details: error.details,
+            hint: error.hint,
+            payloadSent: insertPayload
+          });
+
+          if (isTableMissingError(error)) {
+            console.warn('[trainingService] Table "courses" missing in Supabase. Using local memory fallback.');
+            return newCourse;
+          }
+
+          // If RLS or DB error occurs, throw so UI can notify user of DB error
+          throw new Error(`[Erreur Base de Données ${error.code || ''}]: ${error.message}`);
+        }
+
+        if (data) {
+          console.log('[trainingService.createCourse] Supabase course created successfully:', data.id);
           let dbModules: CourseModule[] = [];
 
           try {
-            const { data: modData } = await supabase
+            const { data: modData, error: modErr } = await supabase
               .from('course_modules')
               .insert([{
                 course_id: data.id,
@@ -153,7 +174,9 @@ export const trainingService = {
               .select()
               .single();
 
-            if (modData) {
+            if (modErr) {
+              console.warn('[trainingService] course_modules insert notice:', modErr);
+            } else if (modData) {
               dbModules = [{
                 id: modData.id,
                 course_id: data.id,
@@ -163,7 +186,7 @@ export const trainingService = {
               }];
             }
           } catch (modErr) {
-            console.warn('Supabase course_modules insert notice:', modErr);
+            console.warn('[trainingService] course_modules insert exception:', modErr);
           }
 
           if (dbModules.length === 0) {
@@ -185,8 +208,11 @@ export const trainingService = {
           localDemoCourses = localDemoCourses.map(c => c.id === newCourse.id ? dbCourse : c);
           return dbCourse;
         }
-      } catch (err) {
-        console.warn('Supabase createCourse fallback to local memory:', err);
+      } catch (err: any) {
+        console.error('[trainingService.createCourse Exception]:', err);
+        if (err.message && err.message.includes('[Erreur Base de Données')) {
+          throw err;
+        }
       }
     }
 

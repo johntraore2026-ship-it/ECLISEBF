@@ -88,8 +88,9 @@ export const TrainingPage: React.FC = () => {
       setSelectedLesson(firstLesson);
       toast.success(`Cursus de formation "${created.title}" créé avec succès !`, 'Nouvelle Formation');
     } catch (err: any) {
-      console.error('Error creating course:', err);
-      toast.error('Erreur lors de la création du cursus.', 'Erreur');
+      console.error('[TrainingPage.handleSaveCourse Error]:', err);
+      toast.error(err.message || 'Erreur lors de la création du cursus.', 'Erreur Base de Données');
+      throw err;
     }
   };
 
@@ -107,8 +108,9 @@ export const TrainingPage: React.FC = () => {
       }
       toast.success(`Leçon "${newLesson.title}" ajoutée au cursus !`, 'Module Ajouté');
     } catch (err: any) {
-      console.error('Error adding lesson:', err);
-      toast.error('Erreur lors de l\'ajout de la leçon.', 'Erreur');
+      console.error('[TrainingPage.handleSaveLesson Error]:', err);
+      toast.error(err.message || 'Erreur lors de l\'ajout de la leçon.', 'Erreur');
+      throw err;
     }
   };
 
