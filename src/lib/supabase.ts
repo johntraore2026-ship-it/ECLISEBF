@@ -115,6 +115,28 @@ export function ensureSupabaseConfigured(): void {
 }
 
 /**
+ * Quick check to verify if Supabase tables exist and are reachable
+ */
+export async function checkSupabaseTablesExist(): Promise<{ tablesExist: boolean; message?: string }> {
+  if (!isSupabaseConfigured) {
+    return { tablesExist: false, message: 'Clés Supabase non renseignées' };
+  }
+  try {
+    const { error } = await supabase.from('churches').select('id').limit(1);
+    if (error) {
+      if (isTableMissingError(error)) {
+        return { tablesExist: false, message: 'Script SQL requis (tables introuvables)' };
+      }
+      // If error is permissions or auth (e.g. RLS requirement), table exists!
+      return { tablesExist: true, message: 'Tables détectées' };
+    }
+    return { tablesExist: true, message: 'Tables détectées' };
+  } catch (err: any) {
+    return { tablesExist: false, message: err?.message || 'Erreur lors de la vérification' };
+  }
+}
+
+/**
  * Helper to get storage public URL or handle fallback
  */
 export function getStorageFileUrl(bucket: string, path: string): string {

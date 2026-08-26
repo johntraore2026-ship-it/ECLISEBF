@@ -17,7 +17,8 @@ import {
   ChevronUp,
   Info,
   ExternalLink,
-  RefreshCw
+  RefreshCw,
+  Key
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
@@ -25,6 +26,7 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase';
 interface AuthPageProps {
   onSuccess?: () => void;
   onOpenSqlModal?: () => void;
+  onOpenCredentialsModal?: () => void;
 }
 
 function translateAuthError(errMsg: string): { title: string; detail: string; suggestion?: string; isEmailConfirmation?: boolean } {
@@ -87,7 +89,11 @@ function translateAuthError(errMsg: string): { title: string; detail: string; su
   };
 }
 
-export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess, onOpenSqlModal }) => {
+export const AuthPage: React.FC<AuthPageProps> = ({
+  onSuccess,
+  onOpenSqlModal,
+  onOpenCredentialsModal
+}) => {
   const { signIn, signUp, setDemoMode, setDemoRole } = useAuth();
 
   const [isRegister, setIsRegister] = useState(false);
@@ -278,12 +284,40 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess, onOpenSqlModal })
                 : 'Connexion Sécurisée'}
             </h2>
             <div className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="text-[10px] font-bold uppercase bg-emerald-950 text-emerald-300 border border-emerald-800 px-2 py-0.5 rounded">
-                Supabase Live
+              <span className={`w-2 h-2 rounded-full ${isSupabaseConfigured ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+              <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded border ${
+                isSupabaseConfigured
+                  ? 'bg-emerald-950 text-emerald-300 border-emerald-800'
+                  : 'bg-amber-950 text-amber-300 border-amber-800'
+              }`}>
+                {isSupabaseConfigured ? 'Supabase Connecté' : 'Supabase à Configurer'}
               </span>
             </div>
           </div>
+
+          {/* Quick Direct Supabase Key Config Banner */}
+          {!isSupabaseConfigured && (
+            <div className="bg-amber-950/80 border border-amber-700/80 text-amber-100 text-xs p-3.5 rounded-2xl space-y-2.5 shadow-md">
+              <div className="flex items-center gap-2 font-bold text-amber-300">
+                <Key className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>Backend Supabase Non Connecté (Clés Manquantes)</span>
+              </div>
+              <p className="text-amber-200/90 text-[11px] leading-relaxed">
+                Avez-vous créé votre projet Supabase ? Saisissez vos clés (<code className="text-emerald-300">URL</code> + <code className="text-emerald-300">Anon Key</code>) ici pour vous connecter sans attendre la recompilation Vercel.
+              </p>
+              {onOpenCredentialsModal && (
+                <button
+                  type="button"
+                  onClick={onOpenCredentialsModal}
+                  id="auth-open-credentials-modal-btn"
+                  className="w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow transition cursor-pointer"
+                >
+                  <Key className="w-4 h-4" />
+                  <span>Renseigner mes Clés Supabase (1-Clic)</span>
+                </button>
+              )}
+            </div>
+          )}
 
           {/* Registration Step Stepper */}
           {isRegister && (
@@ -789,6 +823,23 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess, onOpenSqlModal })
                     </button>
                   )}
                 </div>
+
+                {onOpenCredentialsModal && (
+                  <div className="pt-1.5 border-t border-slate-800">
+                    <span className="font-semibold text-emerald-400">3. Modifier / Entrer les Clés Supabase :</span>
+                    <p className="text-slate-400 mt-0.5 leading-relaxed">
+                      Saisissez l'URL de votre projet et la clé anonyme pour connecter l'application immédiatement sans attendre un nouveau build Vercel.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={onOpenCredentialsModal}
+                      className="mt-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-[11px] font-bold flex items-center gap-1.5 transition shadow"
+                    >
+                      <Key className="w-3.5 h-3.5" />
+                      Saisir / Modifier les Clés Supabase
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>

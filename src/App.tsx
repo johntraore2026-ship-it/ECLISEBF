@@ -54,9 +54,14 @@ const MainAppContent: React.FC = () => {
   if (!user && !isDemoMode) {
     return (
       <>
+        <ConfigBanner
+          onOpenSqlModal={() => setShowSqlModal(true)}
+          onOpenCredentialsModal={() => setShowCredentialsModal(true)}
+        />
         <AuthPage
           onSuccess={() => setActiveTab('dashboard')}
           onOpenSqlModal={() => setShowSqlModal(true)}
+          onOpenCredentialsModal={() => setShowCredentialsModal(true)}
         />
         {showSqlModal && (
           <SqlScriptModal isOpen={showSqlModal} onClose={() => setShowSqlModal(false)} />
@@ -100,6 +105,7 @@ const MainAppContent: React.FC = () => {
         setActiveTab={setActiveTab}
         onOpenRegisterChurch={() => setShowRegisterChurchModal(true)}
         onOpenSqlModal={() => setShowSqlModal(true)}
+        onOpenCredentialsModal={() => setShowCredentialsModal(true)}
       />
 
       {/* Body Layout: Sidebar + Main Views */}

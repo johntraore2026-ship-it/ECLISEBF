@@ -12,7 +12,8 @@ import {
   RefreshCw,
   Sliders,
   Maximize,
-  Minimize
+  Minimize,
+  Key
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { churchService } from '../../services/churchService';
@@ -21,6 +22,7 @@ import { Church } from '../../types';
 interface NavbarProps {
   onOpenRegisterChurch: () => void;
   onOpenSqlModal: () => void;
+  onOpenCredentialsModal?: () => void;
   activeTab: string;
   setActiveTab: (tab: string) => void;
 }
@@ -28,6 +30,7 @@ interface NavbarProps {
 export const Navbar: React.FC<NavbarProps> = ({
   onOpenRegisterChurch,
   onOpenSqlModal,
+  onOpenCredentialsModal,
   activeTab,
   setActiveTab
 }) => {
@@ -250,6 +253,18 @@ export const Navbar: React.FC<NavbarProps> = ({
                   </div>
 
                   <div className="py-1">
+                    {onOpenCredentialsModal && (
+                      <button
+                        onClick={() => {
+                          onOpenCredentialsModal();
+                          setUserDropdownOpen(false);
+                        }}
+                        className="w-full text-left px-3.5 py-2 text-emerald-300 hover:bg-slate-800 flex items-center gap-2 font-medium"
+                      >
+                        <Key className="w-4 h-4 text-emerald-400" />
+                        Gérer les Clés Supabase
+                      </button>
+                    )}
                     <button
                       onClick={() => {
                         setActiveTab('config');
@@ -258,7 +273,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                       className="w-full text-left px-3.5 py-2 text-slate-300 hover:bg-slate-800 flex items-center gap-2"
                     >
                       <Sliders className="w-4 h-4 text-slate-400" />
-                      Configuration Supabase
+                      Architecture & Supabase
                     </button>
                     <button
                       onClick={() => {

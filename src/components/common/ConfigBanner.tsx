@@ -1,19 +1,39 @@
-import React, { useState } from 'react';
-import { AlertTriangle, Database, CheckCircle2, Copy, Check, Key } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { AlertTriangle, Database, CheckCircle2, Copy, Check, Key, X, RefreshCw } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { checkSupabaseTablesExist } from '../../lib/supabase';
 
 export const ConfigBanner: React.FC<{
   onOpenSqlModal?: () => void;
   onOpenCredentialsModal?: () => void;
 }> = ({ onOpenSqlModal, onOpenCredentialsModal }) => {
-  const { isConfigured, isDemoMode, setDemoMode, demoRole, setDemoRole } = useAuth();
+  const { isConfigured, isDemoMode, demoRole, setDemoRole } = useAuth();
   const [copied, setCopied] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
+  const [tablesStatus, setTablesStatus] = useState<{ loading: boolean; exist: boolean; message?: string }>({
+    loading: true,
+    exist: false
+  });
+
+  useEffect(() => {
+    if (isConfigured && !isDemoMode) {
+      checkSupabaseTablesExist().then((res) => {
+        setTablesStatus({
+          loading: false,
+          exist: res.tablesExist,
+          message: res.message
+        });
+      });
+    }
+  }, [isConfigured, isDemoMode]);
 
   const copyEnvSnippet = () => {
     navigator.clipboard.writeText(`VITE_SUPABASE_URL=https://votre-projet.supabase.co\nVITE_SUPABASE_ANON_KEY=eyJhbGci...`);
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);
   };
+
+  if (dismissed) return null;
 
   if (isConfigured && !isDemoMode) {
     return (
@@ -23,10 +43,27 @@ export const ConfigBanner: React.FC<{
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
             <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-400"></span>
           </span>
-          <span className="font-semibold tracking-wide text-emerald-300">SESSION AUTH SUPABASE ACTIVE</span>
+          <span className="font-semibold tracking-wide text-emerald-300">SUPABASE LIVE CONNECTÉ</span>
           <span className="text-slate-600 hidden sm:inline">|</span>
-          <span className="text-slate-300 hidden sm:inline">Pour enregistrer durablement les données, activez vos tables PostgreSQL via le script SQL.</span>
+          
+          {tablesStatus.loading ? (
+            <span className="text-slate-400 flex items-center gap-1.5 text-[11px]">
+              <RefreshCw className="w-3 h-3 animate-spin text-emerald-400" />
+              Vérification des tables PostgreSQL...
+            </span>
+          ) : tablesStatus.exist ? (
+            <span className="text-emerald-300 font-medium flex items-center gap-1 text-[11px]">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+              Tables PostgreSQL Détectées & Prêtes !
+            </span>
+          ) : (
+            <span className="text-amber-300 font-medium text-[11px] flex items-center gap-1">
+              <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              Tables introuvables : Exécutez le script SQL ci-contre dans l'éditeur Supabase.
+            </span>
+          )}
         </div>
+
         <div className="flex items-center gap-2">
           {onOpenCredentialsModal && (
             <button
@@ -44,9 +81,17 @@ export const ConfigBanner: React.FC<{
               className="text-xs bg-emerald-700 hover:bg-emerald-600 text-white font-medium px-3 py-1 rounded-lg transition flex items-center gap-1.5 shadow-sm"
             >
               <Database className="w-3.5 h-3.5 text-emerald-200" />
-              <span>Script SQL (1-Clic)</span>
+              <span>Script SQL</span>
             </button>
           )}
+          <button
+            onClick={() => setDismissed(true)}
+            aria-label="Masquer le bandeau"
+            title="Masquer le bandeau"
+            className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition ml-1"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
       </div>
     );
